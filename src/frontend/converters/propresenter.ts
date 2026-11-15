@@ -829,6 +829,17 @@ function buildTimeline(cues: any[], layouts: any[], slides: Record<string, Slide
 }
 
 function convertItem(item: any): Item {
+    if (item.kind === "media") {
+        // ProPresenter image-filled element (logo, panel, full-bleed art) -> media item at the element bounds.
+        return { style: boxStyle(item.bounds, item.opacity), type: "media", src: item.src, fit: "fill", decoration: true } as Item
+    }
+    if (item.kind === "shape") {
+        const b = item.bounds || {}
+        const w = Math.max(1, b.size?.width || 1)
+        const h = Math.max(1, b.size?.height || 1)
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect x="0" y="0" width="${w}" height="${h}" fill="${item.color || "#000000"}"/></svg>`
+        return { style: boxStyle(item.bounds, item.opacity), type: "icon", customSvg: svg, decoration: true } as Item
+    }
     const align: string = item.align || ""
     const textLines = ((item.text as string) || "").split("\n")
     return {
@@ -856,6 +867,15 @@ function measureTextWidth(text: string, fontPx: number, family: string, bold: bo
     } catch {
         return 0
     }
+}
+
+function boxStyle(bounds: any, opacity?: number): string {
+    const pos = bounds?.origin
+    const size = bounds?.size
+    if (!pos || !size || size.width == null || size.height == null) return DEFAULT_ITEM_STYLE
+    let s = `left:${pos.x ?? 0}px;top:${pos.y ?? 0}px;width:${size.width}px;height:${size.height}px;`
+    if (typeof opacity === "number" && opacity < 1) s += `opacity:${opacity};`
+    return s
 }
 
 function getItemStyle(item: any, textLines: string[] = []): string {
@@ -921,6 +941,37 @@ function getGroups(cueGroups: any): Record<string, any> {
     return newGroups
 }
 
+function getItems(baseSlide: any): any[] {
+    const elements = baseSlide?.elements || []
+    const order = baseSlide?.elementBuildOrder
+    let els = elements.map((e: any, i: number) => ({ e, i, uuid: e?.element?.uuid?.string }))
+    if (Array.isArray(order) && order.length) {
+        const rank = new Map<any, number>()
+        order.forEach((o: any, idx: number) => rank.set(o && typeof o === "object" ? o.string ?? o : o, idx))
+        els = [...els].sort((a, b) => {
+            const ra = rank.has(a.uuid) ? (rank.get(a.uuid) as number) : rank.has(a.i) ? (rank.get(a.i) as number) : a.i
+            const rb = rank.has(b.uuid) ? (rank.get(b.uuid) as number) : rank.has(b.i) ? (rank.get(b.i) as number) : b.i
+            return ra - rb
+        })
+    } else {
+        // No explicit build order: ProPresenter arrays elements front-to-back, so reverse for bottom-to-top paint order.
+        els = els.slice().reverse()
+    }
+    const out: any[] = []
+    els.forEach(({ e }) => {
+        const element = e.element || {}
+        const bounds = element.bounds
+        const fill = element.fill
+        const mediaUrl = fill?.media?.url?.absoluteString || ""
+        const opacity = typeof element.opacity === "number" ? element.opacity : 1
+        if (mediaUrl) out.push({ kind: "media", bounds, src: mediaUrl, opacity })
+        else if (fill?.color) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
+        const decoded = decodeRTF(element.text?.rtfData)
+        if (decoded && decoded.trim()) out.push(getItem(e))
+    })
+    return out
+}
+
 function getSlides(cues: any): Record<string, any> {
     const slides: Record<string, any> = {}
     if (!Array.isArray(cues)) return slides
@@ -935,7 +986,7 @@ function getSlides(cues: any): Record<string, any> {
             media: slide.actions?.find((a: any) => a.media?.element)?.media?.element?.url?.absoluteString,
             backgroundColor: getColorValue(baseSlide.backgroundColor),
             size: baseSlide.size,
-            items: baseSlide.elements?.map(getItem) || []
+            items: getItems(baseSlide)
         }
     })
 
@@ -947,6 +998,7 @@ function getItem(item: any) {
     const attributes = element.text?.attributes || {}
     const font = attributes.font
     return {
+        kind: "text",
         bounds: element.bounds,
         text: decodeRTF(element.text?.rtfData),
         font: font
