@@ -965,7 +965,9 @@ function getItems(baseSlide: any): any[] {
         const mediaUrl = fill?.media?.url?.absoluteString || ""
         const opacity = typeof element.opacity === "number" ? element.opacity : 1
         if (mediaUrl) out.push({ kind: "media", bounds, src: mediaUrl, opacity })
-        else if (fill?.color && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
+        // A color fill is only a real drawn box when explicitly enabled; unset means the element fill is not shown
+        // (e.g. blue text elements) and the text carries its own color.
+        else if (fill?.color && fill.enable === true && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
         const decoded = decodeRTF(element.text?.rtfData)
         if (decoded && decoded.trim()) out.push(getItem(e))
     })
@@ -1009,7 +1011,15 @@ function getItem(item: any) {
                   caps: /CAPS/i.test(String(font.face || "")) || /CAPS/i.test(String(font.name || ""))
               }
             : null,
-        color: attributes.textSolidFill ? fillColorValue(attributes.textSolidFill) : "",
+        // Text color: the text's own solid fill only when it carries real RGB; an alpha-only fill means "unset",
+        // in which case the glyph color is the element fill color (common in these files).
+        color: (() => {
+            const tsf = attributes.textSolidFill
+            const hasRgb = !!(tsf && (tsf.red != null || tsf.green != null || tsf.blue != null))
+            if (hasRgb) return fillColorValue(tsf)
+            if (element.fill?.color) return fillColorValue(element.fill.color)
+            return tsf ? fillColorValue(tsf) : ""
+        })(),
         align: mapAlignment(attributes.paragraphStyle?.alignment || "")
     }
 }
