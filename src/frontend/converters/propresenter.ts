@@ -965,7 +965,7 @@ function getItems(baseSlide: any): any[] {
         const mediaUrl = fill?.media?.url?.absoluteString || ""
         const opacity = typeof element.opacity === "number" ? element.opacity : 1
         if (mediaUrl) out.push({ kind: "media", bounds, src: mediaUrl, opacity })
-        else if (fill?.color) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
+        else if (fill?.color && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
         const decoded = decodeRTF(element.text?.rtfData)
         if (decoded && decoded.trim()) out.push(getItem(e))
     })
@@ -1016,9 +1016,9 @@ function getItem(item: any) {
 
 // ProPresenter stores text fills as 0-1 floats; convert to CSS rgba.
 function fillColorValue(fill: { red?: number; green?: number; blue?: number; alpha?: number }) {
-    const r = Math.round((fill.red ?? 1) * 255)
-    const g = Math.round((fill.green ?? 1) * 255)
-    const b = Math.round((fill.blue ?? 1) * 255)
+    const r = Math.round((fill.red ?? 0) * 255)
+    const g = Math.round((fill.green ?? 0) * 255)
+    const b = Math.round((fill.blue ?? 0) * 255)
     const a = fill.alpha ?? 1
     return `rgba(${r},${g},${b},${a})`
 }
