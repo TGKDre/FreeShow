@@ -843,6 +843,21 @@ function normalizeFamily(name: string): string {
     return /CMG\s*Sans/i.test(n) ? "CMG Sans" : n
 }
 
+let _measureCanvas: HTMLCanvasElement | null = null
+function measureTextWidth(text: string, fontPx: number, family: string, bold: boolean, caps: boolean): number {
+    try {
+        if (typeof document === "undefined" || !text) return 0
+        if (!_measureCanvas) _measureCanvas = document.createElement("canvas")
+        const ctx = _measureCanvas.getContext("2d")
+        if (!ctx) return 0
+        const sample = caps ? text.toUpperCase() : text
+        ctx.font = `${bold ? "bold " : ""}${fontPx}px ${fontFamilyCss(family)}`
+        return ctx.measureText(sample).width
+    } catch {
+        return 0
+    }
+}
+
 function getItemStyle(item: any, textLines: string[] = []): string {
     const bounds = item.bounds
     const pos = bounds?.origin
@@ -854,16 +869,23 @@ function getItemStyle(item: any, textLines: string[] = []): string {
     const font = item.font
     if (font?.family) extra += `font-family:${fontFamilyCss(font.family)};`
     if (font?.size) {
-        let fontPx = Math.round(font.size * (96 / 72))
-        // ProPresenter shrinks text to fit its box; cap the size to the box (width prevents wrap, height prevents overflow).
-        if (hasBox) {
-            const n = Math.max(1, textLines.filter((l) => l.trim()).length)
-            const longest = Math.max(1, ...textLines.map((l) => l.length))
-            const fitWidth = (size.width * 0.98) / (longest * 0.62)
-            const fitHeight = (size.height * 0.95) / (n * 1.45)
-            fontPx = Math.max(18, Math.floor(Math.min(fontPx, fitWidth, fitHeight)))
+        const desired = Math.round(font.size * (96 / 72))
+        let fontPx = desired
+        // ProPresenter shrinks text to fit its box. Measure real rendered width and step the size down until the
+        // longest line fits the box, so nothing wraps and pushes a line out of the box (which clips it).
+        if (hasBox && textLines.length) {
+            const nonEmpty = textLines.filter((l) => l.trim())
+            const n = Math.max(1, nonEmpty.length)
+            const longest = textLines.reduce((a, b) => (b.length > a.length ? b : a), "")
+            let byWidth = desired
+            if (measureTextWidth(longest, desired, font.family, font.bold, font.caps) > 0) {
+                while (byWidth > 18 && measureTextWidth(longest, byWidth, font.family, font.bold, font.caps) > size.width * 0.94) byWidth--
+            }
+            const byHeight = Math.floor((size.height * 0.96) / (n * 1.2))
+            fontPx = Math.max(18, Math.min(desired, byWidth, byHeight))
         }
         extra += `font-size:${fontPx}px;`
+        extra += "line-height:1.2;"
     }
     if (font?.bold) extra += "font-weight:bold;"
     if (font?.caps) extra += "text-transform:uppercase;"
