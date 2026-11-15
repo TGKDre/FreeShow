@@ -829,20 +829,29 @@ function buildTimeline(cues: any[], layouts: any[], slides: Record<string, Slide
 }
 
 function convertItem(item: any): Item {
+    const align: string = item.align || ""
     return {
         style: getItemStyle(item),
-        lines: (item.text as string).split("\n").map((lineText) => ({ align: "", text: [{ value: lineText, style: "" }] }))
+        lines: ((item.text as string) || "").split("\n").map((lineText) => ({ align, text: [{ value: lineText, style: "" }] }))
     }
 }
 
 function getItemStyle(item: any): string {
     const bounds = item.bounds
-    if (!bounds) return DEFAULT_ITEM_STYLE
+    const pos = bounds?.origin
+    const size = bounds?.size
+    const base =
+        pos && size && pos.x != null && pos.y != null && size.width != null && size.height != null ? `left:${pos.x}px;top:${pos.y}px;width:${size.width}px;height:${size.height}px;` : DEFAULT_ITEM_STYLE
 
-    const { origin: pos, size } = bounds
-    if (Object.keys(pos).length !== 2 || Object.keys(size).length !== 2) return DEFAULT_ITEM_STYLE
+    let extra = ""
+    const font = item.font
+    if (font?.name) extra += `font-family:${fontFamilyCss(font.name)};`
+    if (font?.size) extra += `font-size:${Math.round(font.size * (96 / 72))}px;`
+    if (font?.bold) extra += "font-weight:bold;"
+    if (item.color) extra += `color:${item.color};`
+    if (item.align) extra += `text-align:${item.align};`
 
-    return `left:${pos.x}px;top:${pos.y}px;width:${size.width}px;height:${size.height}px;`
+    return base + extra
 }
 
 function getArrangements(arrangements: any): any[] {
@@ -893,10 +902,40 @@ function getSlides(cues: any): Record<string, any> {
 }
 
 function getItem(item: any) {
+    const element = item.element || {}
+    const attributes = element.text?.attributes || {}
+    const font = attributes.font
     return {
-        bounds: item.element.bounds,
-        text: decodeRTF(item.element.text?.rtfData)
+        bounds: element.bounds,
+        text: decodeRTF(element.text?.rtfData),
+        font: font ? { name: font.name || font.family || "", size: font.size || 0, bold: !!font.bold } : null,
+        color: attributes.textSolidFill ? fillColorValue(attributes.textSolidFill) : "",
+        align: mapAlignment(attributes.paragraphStyle?.alignment || "")
     }
+}
+
+// ProPresenter stores text fills as 0-1 floats; convert to CSS rgba.
+function fillColorValue(fill: { red?: number; green?: number; blue?: number; alpha?: number }) {
+    const r = Math.round((fill.red ?? 1) * 255)
+    const g = Math.round((fill.green ?? 1) * 255)
+    const b = Math.round((fill.blue ?? 1) * 255)
+    const a = fill.alpha ?? 1
+    return `rgba(${r},${g},${b},${a})`
+}
+
+function mapAlignment(alignment: string) {
+    if (!alignment) return ""
+    if (/CENTER/.test(alignment)) return "center"
+    if (/RIGHT/.test(alignment)) return "right"
+    if (/LEFT/.test(alignment)) return "left"
+    if (/JUST/.test(alignment)) return "justify"
+    return ""
+}
+
+function fontFamilyCss(name: string) {
+    const quoted = /\s/.test(name) ? `'${name}'` : name
+    // Fall back to a generic sans face so a missing font degrades cleanly instead of to a serif default.
+    return `${quoted}, sans-serif`
 }
 
 function decodeRTF(text: string): string {
