@@ -837,6 +837,12 @@ function convertItem(item: any): Item {
     }
 }
 
+function normalizeFamily(name: string): string {
+    // Any CMG Sans face ("CMG Sans", "CMGSans-BoldCAPS", ... ) -> the installed family name Windows/CSS will match.
+    const n = String(name || "").trim()
+    return /CMG\s*Sans/i.test(n) ? "CMG Sans" : n
+}
+
 function getItemStyle(item: any, textLines: string[] = []): string {
     const bounds = item.bounds
     const pos = bounds?.origin
@@ -923,7 +929,7 @@ function getItem(item: any) {
         text: decodeRTF(element.text?.rtfData),
         font: font
             ? {
-                  family: String(font.family || font.name || "").trim(),
+                  family: normalizeFamily(font.family || font.name || ""),
                   size: font.size || 0,
                   bold: !!font.bold,
                   caps: /CAPS/i.test(String(font.face || "")) || /CAPS/i.test(String(font.name || ""))
