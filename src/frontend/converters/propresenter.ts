@@ -934,8 +934,8 @@ function mapAlignment(alignment: string) {
 
 function fontFamilyCss(name: string) {
     const quoted = /\s/.test(name) ? `'${name}'` : name
-    // Fall back to a generic sans face so a missing font degrades cleanly instead of to a serif default.
-    return `${quoted}, sans-serif`
+    // Church PC has CMG Sans installed; elsewhere fall back to a real free face (Montserrat), never a missing/generic one.
+    return `${quoted}, Montserrat, sans-serif`
 }
 
 function decodeRTF(text: string): string {
