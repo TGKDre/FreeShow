@@ -830,23 +830,35 @@ function buildTimeline(cues: any[], layouts: any[], slides: Record<string, Slide
 
 function convertItem(item: any): Item {
     const align: string = item.align || ""
+    const textLines = ((item.text as string) || "").split("\n")
     return {
-        style: getItemStyle(item),
-        lines: ((item.text as string) || "").split("\n").map((lineText) => ({ align, text: [{ value: lineText, style: "" }] }))
+        style: getItemStyle(item, textLines),
+        lines: textLines.map((lineText) => ({ align, text: [{ value: lineText, style: "" }] }))
     }
 }
 
-function getItemStyle(item: any): string {
+function getItemStyle(item: any, textLines: string[] = []): string {
     const bounds = item.bounds
     const pos = bounds?.origin
     const size = bounds?.size
-    const base =
-        pos && size && pos.x != null && pos.y != null && size.width != null && size.height != null ? `left:${pos.x}px;top:${pos.y}px;width:${size.width}px;height:${size.height}px;` : DEFAULT_ITEM_STYLE
+    const hasBox = !!(pos && size && pos.x != null && pos.y != null && size.width != null && size.height != null)
+    const base = hasBox ? `left:${pos.x}px;top:${pos.y}px;width:${size.width}px;height:${size.height}px;` : DEFAULT_ITEM_STYLE
 
     let extra = ""
     const font = item.font
     if (font?.family) extra += `font-family:${fontFamilyCss(font.family)};`
-    if (font?.size) extra += `font-size:${Math.round(font.size * (96 / 72))}px;`
+    if (font?.size) {
+        let fontPx = Math.round(font.size * (96 / 72))
+        // ProPresenter shrinks text to fit its box; cap the size to the box (width prevents wrap, height prevents overflow).
+        if (hasBox) {
+            const n = Math.max(1, textLines.filter((l) => l.trim()).length)
+            const longest = Math.max(1, ...textLines.map((l) => l.length))
+            const fitWidth = (size.width * 0.98) / (longest * 0.62)
+            const fitHeight = (size.height * 0.95) / (n * 1.45)
+            fontPx = Math.max(18, Math.floor(Math.min(fontPx, fitWidth, fitHeight)))
+        }
+        extra += `font-size:${fontPx}px;`
+    }
     if (font?.bold) extra += "font-weight:bold;"
     if (font?.caps) extra += "text-transform:uppercase;"
     if (item.color) extra += `color:${item.color};`
