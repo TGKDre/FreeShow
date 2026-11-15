@@ -9,9 +9,10 @@ import WordExtractor from "word-extractor"
 import { ToMain } from "../../types/IPC/ToMain"
 import { sendToMain } from "../IPC/main"
 import { pptToShow } from "../output/ppt/pptToShow"
-import { asyncPool, doesPathExist, getDataFolderPath, getExtension, readFileAsync, readFileBufferAsync } from "../utils/files"
+import { asyncPool, doesPathExist, getDataFolderPath, getExtension, getMediaSyncFolderPath, readFileAsync, readFileBufferAsync, writeFile } from "../utils/files"
 import { detectFileType } from "./bibleDetecter"
 import { filePathHashCode } from "./thumbnails"
+import { materializeMedia } from "./ppMedia"
 import { decompressZip, decompressZipStream, isZip } from "./zip"
 
 type FileData = { content: Buffer | string | object; path?: string; name?: string; extension?: string }
@@ -159,7 +160,7 @@ async function readFile(filePath: string, encoding: BufferEncoding = "utf8", id?
     const extension: string = getExtension(filePath)
 
     try {
-        if (id === "propresenter" && extension === "pro") content = await decodeProto(filePath)
+        if (id === "propresenter" && extension === "pro") content = await decodeProtoWithMedia(filePath)
         else content = await readFileAsync(filePath, encoding)
     } catch (err) {
         console.error("Error reading file:", (err as Error).stack)
@@ -344,6 +345,41 @@ async function decodeProto(filePath: string, fileContent: Buffer | null = null) 
     const message = Presentation.decode(buffer)
 
     return JSON.stringify(message)
+}
+
+// Decode a .pro and copy every referenced media file (logos, panel art, backgrounds, video fills)
+// into the app media folder, rewriting the references to the copies. ProPresenter stores absolute
+// Windows paths, so without this an imported show breaks the moment the library moves, is taken off
+// OneDrive, or is opened on another machine.
+async function decodeProtoWithMedia(filePath: string) {
+    const content = await decodeProto(filePath)
+
+    try {
+        const presentation = JSON.parse(content)
+        const report = materializeMedia(presentation, filePath, getMediaSyncFolderPath())
+
+        if (report.copied || report.missing.length || report.skipped.length) {
+            console.info(`ProPresenter media for "${path.basename(filePath)}": ${report.copied} copied (${Math.round(report.bytesCopied / 1024)} KB), ${report.missing.length} missing, ${report.skipped.length} skipped`)
+            writeMediaReport(filePath, report)
+        }
+
+        return JSON.stringify(presentation)
+    } catch (err) {
+        // never block an import because of media handling, the app can still try the original paths
+        console.error("ProPresenter media relocation failed:", (err as Error).stack)
+        return content
+    }
+}
+
+function writeMediaReport(filePath: string, report: { relocated: Record<string, string>; missing: string[]; skipped: string[]; copied: number; bytesCopied: number }) {
+    try {
+        const folder = getDataFolderPath("imports", "ProPresenter")
+        const name = path.basename(filePath).replace(/\.pro$/i, "")
+        const reportPath = join(folder, `${name} media report.json`)
+        writeFile(reportPath, JSON.stringify({ file: filePath, time: Date.now(), ...report }, null, 2))
+    } catch (err) {
+        console.error("Could not write media report:", err)
+    }
 }
 
 async function checkSpecial(file: FileData) {
