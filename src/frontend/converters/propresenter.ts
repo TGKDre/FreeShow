@@ -845,9 +845,10 @@ function getItemStyle(item: any): string {
 
     let extra = ""
     const font = item.font
-    if (font?.name) extra += `font-family:${fontFamilyCss(font.name)};`
+    if (font?.family) extra += `font-family:${fontFamilyCss(font.family)};`
     if (font?.size) extra += `font-size:${Math.round(font.size * (96 / 72))}px;`
     if (font?.bold) extra += "font-weight:bold;"
+    if (font?.caps) extra += "text-transform:uppercase;"
     if (item.color) extra += `color:${item.color};`
     if (item.align) extra += `text-align:${item.align};`
 
@@ -908,7 +909,14 @@ function getItem(item: any) {
     return {
         bounds: element.bounds,
         text: decodeRTF(element.text?.rtfData),
-        font: font ? { name: font.name || font.family || "", size: font.size || 0, bold: !!font.bold } : null,
+        font: font
+            ? {
+                  family: String(font.family || font.name || "").trim(),
+                  size: font.size || 0,
+                  bold: !!font.bold,
+                  caps: /CAPS/i.test(String(font.face || "")) || /CAPS/i.test(String(font.name || ""))
+              }
+            : null,
         color: attributes.textSolidFill ? fillColorValue(attributes.textSolidFill) : "",
         align: mapAlignment(attributes.paragraphStyle?.alignment || "")
     }
