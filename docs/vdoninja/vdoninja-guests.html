@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grace City Presenter - VDO.Ninja Guest Links</title>
+<style>
+  :root { --bg:#0a0a0b; --panel:#141518; --edge:#24262a; --gold:#d6ae31; --gold2:#f3ce3c; --text:#f6f1e4; --muted:#9a958a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; color:var(--gold2); margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; max-width:980px; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em; }
+  input, textarea { width:100%; background:var(--panel); border:1px solid var(--edge); color:var(--text); border-radius:8px; padding:10px 12px; font:inherit; }
+  input:focus, textarea:focus { outline:none; border-color:var(--gold); }
+  textarea { min-height:90px; resize:vertical; }
+  .row { max-width:980px; margin-top:14px; }
+  button { background:linear-gradient(180deg,var(--gold2),var(--gold)); color:#1a1500; border:0; border-radius:8px; padding:11px 20px; font-weight:700; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--gold); border:1px solid var(--edge); font-weight:600; }
+  #out { max-width:980px; margin-top:24px; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px 16px; margin-bottom:12px; }
+  .card h3 { margin:0 0 8px; font-size:15px; color:var(--gold2); }
+  .link { display:flex; gap:8px; align-items:center; margin:6px 0; }
+  .link input { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; }
+  .link button { padding:6px 10px; font-size:12px; }
+  .hint { color:var(--muted); font-size:12px; margin:4px 0 0; }
+  .copied { color:var(--gold2); font-size:12px; min-width:54px; }
+</style>
+</head>
+<body>
+  <h1>VDO.Ninja Guest Links</h1>
+  <p class="sub">Generate a push link per remote guest and a matching capture URL for OBS/GCP. Free, AGPL, self-hostable.</p>
+
+  <div class="grid">
+    <div>
+      <label for="base">VDO.Ninja base URL</label>
+      <input id="base" value="https://vdo.ninja" spellcheck="false" />
+      <p class="hint">Self-hosting? put your instance URL here.</p>
+    </div>
+    <div>
+      <label for="room">Room name</label>
+      <input id="room" value="gracecity" spellcheck="false" />
+    </div>
+    <div>
+      <label for="pass">Room password (optional)</label>
+      <input id="pass" placeholder="leave blank for none" spellcheck="false" />
+    </div>
+  </div>
+
+  <div class="row">
+    <label for="guests">Guests (one name per line)</label>
+    <textarea id="guests" placeholder="Pastor John&#10;Choir - Mary&#10;Guest Speaker"></textarea>
+  </div>
+
+  <div class="row">
+    <button id="go">Generate links</button>
+    <button id="copyAll" class="ghost">Copy invite list for guests</button>
+  </div>
+
+  <div id="out"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const enc = encodeURIComponent;
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "guest";
+}
+function pw() { const p = $("pass").value.trim(); return p ? "&password=" + enc(p) : ""; }
+function base() { return $("base").value.trim().replace(/\/+$/, "") || "https://vdo.ninja"; }
+function room() { return slug($("room").value.trim() || "gracecity"); }
+
+function build() {
+  const b = base(), r = room(), password = pw();
+  const names = $("guests").value.split(/\n/).map((s) => s.trim()).filter(Boolean);
+  const out = $("out");
+  out.innerHTML = "";
+  if (!names.length) { out.innerHTML = '<div class="card"><h3>Add at least one guest name.</h3></div>'; return; }
+
+  // Group scene (all guests mixed into one layout) for a single capture source.
+  const sceneUrl = `${b}/?room=${r}&scene&cleanoutput${password}`;
+  const directorUrl = `${b}/?director=${r}${password}`;
+
+  out.appendChild(card("Director control room (you)", [
+    ["Open in your browser to manage guests, mute, and arrange", directorUrl]
+  ]));
+  out.appendChild(card("Group capture (all guests, one source)", [
+    ["Paste into an OBS Browser Source (or GCP browser capture) for the tile/grid feed", sceneUrl]
+  ]));
+
+  const used = new Set();
+  names.forEach((name, i) => {
+    let id = `${r}_${slug(name)}`;
+    while (used.has(id)) id = `${r}_${slug(name)}_${i}`;
+    used.add(id);
+    const push = `${b}/?room=${r}&push=${id}&label=${enc(name)}&webcam${password}`;
+    const view = `${b}/?room=${r}&view=${id}&solo&cleanoutput&label=${enc(name)}${password}`;
+    out.appendChild(card("Guest: " + name, [
+      ["Push link - send this to " + name, push],
+      ["Individual capture - paste into an OBS Browser Source for a solo feed of " + name, view]
+    ], true));
+  });
+
+  window.__lastInvite = names.map((n) => n + ": " + `${b}/?room=${r}&push=${r}_${slug(n)}&label=${enc(n)}&webcam${password}`).join("\n");
+}
+
+function card(title, links, individual) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const h = document.createElement("h3");
+  h.textContent = title;
+  el.appendChild(h);
+  links.forEach(([desc, url]) => {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = desc;
+    el.appendChild(p);
+    const wrap = document.createElement("div");
+    wrap.className = "link";
+    const input = document.createElement("input");
+    input.value = url;
+    input.readOnly = true;
+    const btn = document.createElement("button");
+    btn.textContent = "Copy";
+    const ok = document.createElement("span");
+    ok.className = "copied";
+    btn.onclick = async () => {
+      try { await navigator.clipboard.writeText(url); ok.textContent = "copied"; }
+      catch { input.select(); document.execCommand("copy"); ok.textContent = "copied"; }
+      setTimeout(() => (ok.textContent = ""), 1500);
+    };
+    wrap.append(input, btn, ok);
+    el.appendChild(wrap);
+  });
+  return el;
+}
+
+$("go").onclick = build;
+$("copyAll").onclick = async () => {
+  if (!window.__lastInvite) build();
+  try { await navigator.clipboard.writeText(window.__lastInvite || ""); alert("Invite list copied. Send each line to its guest."); }
+  catch { alert(window.__lastInvite || "Generate links first."); }
+};
+build();
+</script>
+</body>
+</html>
