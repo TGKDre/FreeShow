@@ -92,17 +92,26 @@ describe("decodePPTheme", () => {
             expect(true).toBe(true)
             return
         }
-        const folders = readdirSync(dir).filter((d) => existsSync(path.join(dir, d, "Theme")))
-        expect(folders.length).toBeGreaterThan(30)
+        // Themes nest: most are <theme>/Theme, but a category like "Lyric Styles" holds
+        // sub-themes (<category>/<sub>/Theme). Walk recursively so all are counted.
+        const themeFiles: string[] = []
+        const walk = (d: string) => {
+            for (const entry of readdirSync(d, { withFileTypes: true })) {
+                const full = path.join(d, entry.name)
+                if (entry.isDirectory()) walk(full)
+                else if (entry.isFile() && entry.name === "Theme") themeFiles.push(full)
+            }
+        }
+        walk(dir)
+        expect(themeFiles.length).toBeGreaterThanOrEqual(44)
         let slides = 0
         let elements = 0
-        for (const folder of folders) {
-            const buf = readFileSync(path.join(dir, folder, "Theme"))
-            const theme = decodePPTheme(buf, Slide)
+        for (const file of themeFiles) {
+            const theme = decodePPTheme(readFileSync(file), Slide)
             slides += theme.slides.length
             elements += theme.slides.reduce((sum, s) => sum + s.elements.length, 0)
         }
-        expect(slides).toBeGreaterThan(300)
-        expect(elements).toBeGreaterThan(900)
+        expect(slides).toBeGreaterThan(340)
+        expect(elements).toBeGreaterThan(1000)
     })
 })
