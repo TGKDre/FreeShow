@@ -837,13 +837,15 @@ function convertItem(item: any): Item {
         const b = item.bounds || {}
         const w = Math.max(1, b.size?.width || 1)
         const h = Math.max(1, b.size?.height || 1)
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect x="0" y="0" width="${w}" height="${h}" fill="${item.color || "#000000"}"/></svg>`
+        // Rounded boxes carry the badge plates: ProPresenter stores them as empty text boxes with a fill.
+        const corner = item.round ? Math.min(w, h) / 2 : 0
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect x="0" y="0" width="${w}" height="${h}" rx="${corner}" ry="${corner}" fill="${item.color || "#000000"}"/></svg>`
         return { style: boxStyle(item.bounds, item.opacity), type: "icon", customSvg: svg, decoration: true } as Item
     }
     const align: string = item.align || ""
     const textLines = ((item.text as string) || "").split("\n")
     return {
-        style: getItemStyle(item, textLines),
+        style: getItemStyle(item),
         lines: textLines.map((lineText) => ({ align, text: [{ value: lineText, style: "" }] }))
     }
 }
@@ -898,20 +900,6 @@ function resolveFace(name: string, bold?: boolean): { family: string; weight?: s
     return { family: n, weight: bold ? "bold" : undefined }
 }
 
-let _measureCanvas: HTMLCanvasElement | null = null
-function measureTextWidth(text: string, fontPx: number, family: string, weight: string, caps: boolean): number {
-    try {
-        if (typeof document === "undefined" || !text) return 0
-        if (!_measureCanvas) _measureCanvas = document.createElement("canvas")
-        const ctx = _measureCanvas.getContext("2d")
-        if (!ctx) return 0
-        const sample = caps ? text.toUpperCase() : text
-        ctx.font = `${weight || "400"} ${fontPx}px ${fontFamilyCss(family)}`
-        return ctx.measureText(sample).width
-    } catch {
-        return 0
-    }
-}
 
 function boxStyle(bounds: any, opacity?: number): string {
     const pos = bounds?.origin
@@ -922,7 +910,7 @@ function boxStyle(bounds: any, opacity?: number): string {
     return s
 }
 
-function getItemStyle(item: any, textLines: string[] = []): string {
+function getItemStyle(item: any): string {
     const bounds = item.bounds
     const pos = bounds?.origin
     const size = bounds?.size
@@ -938,35 +926,40 @@ function getItemStyle(item: any, textLines: string[] = []): string {
         // fits its 96 unit box at 1:1 (2 x 39 x 1.2 = 94), and a 50pt badge digit only fits its 61 unit
         // badge box at 1:1. Scaling by 96/72 (as if these were print points) made every line 33 percent
         // too large, so blocks overflowed their boxes and clashed with the rows above and below them.
-        const desired = Math.max(1, Math.round(font.size))
-        let fontPx = desired
-        // ProPresenter shrinks text to fit its box. Measure real rendered width and step the size down until the
-        // longest line fits the box, so nothing wraps and pushes a line out of the box (which clips it).
-        if (hasBox && textLines.length) {
-            const nonEmpty = textLines.filter((l) => l.trim())
-            const n = Math.max(1, nonEmpty.length)
-            const longest = textLines.reduce((a, b) => (b.length > a.length ? b : a), "")
-            const weight = font.weight || (font.bold ? "bold" : "400")
-            let byWidth = desired
-            if (measureTextWidth(longest, desired, font.family, weight, font.caps) > 0) {
-                while (byWidth > 18 && measureTextWidth(longest, byWidth, font.family, weight, font.caps) > size.width * 0.94) byWidth--
-            }
-            const byHeight = Math.floor((size.height * 0.96) / (n * (font.lineHeight || 1)))
-            fontPx = Math.max(18, Math.min(desired, byWidth, byHeight))
-        }
+        // Render the stored size exactly. ProPresenter does not fit text to the box: it trusts the file, anchors the
+        // block at the bottom edge of the box, and lets a long line run. Every attempt to auto-fit here (shrink,
+        // condense, reflow) produced text that either wrapped into the next row or clipped words off.
+        const fontPx = Math.max(1, Math.round(font.size))
         extra += `font-size:${fontPx}px;`
-        // ProPresenter's paragraphStyle.lineHeightMultiple is 1 in these decks, and its line box is the font size
-        // itself. CSS line-height 1.2 added 20 percent per line, which pushed a subtitle up into the title above it
-        // (visible as touching lines on dense announcement rows).
-        extra += `line-height:${font?.lineHeight || 1};`
-        // ProPresenter text boxes keep the designer's own line breaks and do not re-wrap; letting CSS wrap
-        // splits a line into two, which pushes the block past its box and into the row below. The font is
-        // already measured and shrunk to fit the box width, so nothing needs to wrap.
-        extra += "white-space:pre;"
+
+        // A box that only holds one line is a title, and ProPresenter keeps its height while squeezing the line
+        // horizontally to the box width (it never wraps a title). Transforms apply after layout, so the line has to
+        // be told not to wrap first, then condensed.
+        if (hasBox && size.width > 0) {
+            const leading = Math.min(1.15, Math.max(1, font?.lineHeight || 1))
+            const maxLines = Math.max(1, Math.floor((size.height * 0.96) / (font.size * leading)))
+            const longestLine = textLinesOf(item).reduce((a, b) => (b.length > a.length ? b : a), "")
+            const advance = font.caps ? 0.7 : String(font.weight) === "900" || String(font.weight) === "800" || font.bold ? 0.72 : 0.58
+            const needed = Math.max(1, longestLine.length) * advance * fontPx
+            if (maxLines === 1) {
+                extra += "white-space:pre;"
+                if (needed > size.width * 0.98) {
+                    const squeeze = (size.width * 0.98) / needed
+                    extra += `transform:scaleX(${squeeze.toFixed(3)});transform-origin:0 ${item.verticalAlign === "flex-end" ? "100%" : "0"};`
+                }
+            }
+        }
+        // ProPresenter lays a line out in exactly the font size, so its boxes were spaced for cap height with no
+        // extra leading. Any added leading pushes each block down into the next one, which is the clash.
+        extra += `line-height:${Math.min(1.15, Math.max(1, font?.lineHeight || 1))};`
     }
     const fontWeight = font?.weight || (font?.bold ? "bold" : "")
     if (fontWeight) extra += `font-weight:${fontWeight};`
     if (font?.caps) extra += `text-transform:uppercase;`
+    if (item.verticalAlign && item.verticalAlign !== "flex-start") {
+        extra += `display:flex;flex-direction:column;justify-content:${item.verticalAlign};`
+    }
+    if (item.singleLine) extra += "white-space:pre;"
     if (item.color) extra += `color:${item.color};`
     if (item.align) extra += `text-align:${item.align};`
 
@@ -999,6 +992,129 @@ function getGroups(cueGroups: any): Record<string, any> {
     return newGroups
 }
 
+
+// Two text blocks drawn on top of each other (ProPresenter keeps alternates and leftovers stacked) show as a
+// smeared glyph. Keep only the front-most one: items arrive in paint order (back to front).
+function collapseStackedText(items: any[]): any[] {
+    const kept: any[] = []
+    for (const item of items) {
+        const box = item?.bounds
+        if (item?.kind !== "text" || !box?.origin || !box?.size) {
+            kept.push(item)
+            continue
+        }
+        const index = kept.findIndex((other) => other?.kind === "text" && other?.bounds?.origin && overlapFraction(other.bounds, box) > 0.6)
+        if (index >= 0) kept[index] = item
+        else kept.push(item)
+    }
+    return kept
+}
+
+function overlapFraction(a: any, b: any): number {
+    const ax0 = a.origin.x
+    const ay0 = a.origin.y
+    const ax1 = ax0 + a.size.width
+    const ay1 = ay0 + a.size.height
+    const bx0 = b.origin.x
+    const by0 = b.origin.y
+    const bx1 = bx0 + b.size.width
+    const by1 = by0 + b.size.height
+    const w = Math.min(ax1, bx1) - Math.max(ax0, bx0)
+    const h = Math.min(ay1, by1) - Math.max(ay0, by0)
+    if (w <= 0 || h <= 0) return 0
+    const smaller = Math.min(a.size.width * a.size.height, b.size.width * b.size.height) || 1
+    return (w * h) / smaller
+}
+
+// How tall a text block really is once it has been fitted to its box: lines x fitted size x leading.
+function textLinesOf(item: any): string[] {
+    return String(item?.text || "").split(/\r?\n/)
+}
+function fittedFontPx(item: any): number {
+    const font = item?.font
+    const desired = Math.max(1, Math.round(font?.size || 0))
+    const box = item?.bounds?.size
+    if (!desired) return 40
+    if (!box?.width || !box?.height) return desired
+
+    const lines = textLinesOf(item)
+    const nonEmpty = lines.filter((line) => line.trim())
+    const count = Math.max(1, nonEmpty.length)
+    const longest = lines.reduce((a, b) => (b.length > a.length ? b : a), "")
+    void (font?.weight || (font?.bold ? "bold" : "400"))
+
+    // Canvas metrics run slightly narrow against the real render (synthetic bold, fallback faces), so leave a
+    // safety margin: a line that measures at 94 percent of the box can still wrap and clip on screen.
+    // Fit by character advance instead of a canvas measurement. The canvas is measured at import time, before the
+    // app has loaded its web fonts, so it reports a narrower face than what actually renders; the import then
+    // leaves text that wraps on screen, overflowing its box and running into the row below.
+    const lineHeight = Math.min(1.15, Math.max(1, font?.lineHeight || 1))
+    const characters = Math.max(1, (font.caps ? longest.toUpperCase() : longest).length)
+    // How many lines the box can hold at the stored size. A box that only holds one line is a title: ProPresenter
+    // keeps its height and squeezes the line horizontally rather than shrinking the type or wrapping it.
+    void characters
+    const maxLines = Math.max(1, Math.floor((box.height * 0.96) / (desired * lineHeight)))
+    void maxLines
+    const byWidth = desired
+    const byHeight = Math.floor((box.height * 0.96) / (count * Math.min(1.15, Math.max(1, font?.lineHeight || 1))))
+    return Math.max(18, Math.min(desired, byWidth, Math.max(12, byHeight)))
+}
+function blockHeight(item: any): number {
+    const lines = Math.max(1, textLinesOf(item).filter((line) => line.trim()).length)
+    return lines * fittedFontPx(item) * Math.min(1.15, Math.max(1, item?.font?.lineHeight || 1))
+}
+
+// The church decks place text boxes that overlap on purpose, and ProPresenter does not reflow them. Copying the
+// boxes literally makes a title and its subtitle collide. Lay the text column out again instead: walk the blocks
+// top to bottom, push each one clear of the blocks above it in the same column, and if the column would still run
+// off the slide, shrink the type and the gaps together until it fits.
+const TEXT_BLOCK_GAP = 12
+function spaceOutText(items: any[], slide?: { width: number; height: number }): any[] {
+    const texts = items.filter((item) => item?.kind === "text" && item?.bounds?.origin && item?.bounds?.size)
+    if (texts.length < 2) return items
+
+    const height = slide?.height || 1080
+    // keep clear of the bottom edge: rendered ink runs a little past the computed block height
+    const margin = 70
+
+    for (let attempt = 0; attempt < 14; attempt++) {
+        const sorted = [...texts].sort((a, b) => a.bounds.origin.y - b.bounds.origin.y)
+        const top = sorted[0].bounds.origin.y
+        const placed: { x0: number; x1: number; bottom: number }[] = []
+        let maxBottom = top
+
+        for (const item of sorted) {
+            const box = item.bounds
+            const x0 = box.origin.x
+            const x1 = x0 + box.size.width
+            const needed = blockHeight(item)
+
+            let y = box.origin.y
+            for (const other of placed) {
+                const overlapX = Math.min(x1, other.x1) - Math.max(x0, other.x0)
+                if (overlapX > Math.min(x1 - x0, other.x1 - other.x0) * 0.25) y = Math.max(y, other.bottom + TEXT_BLOCK_GAP)
+            }
+
+            box.origin.y = y
+            placed.push({ x0, x1, bottom: y + needed })
+            maxBottom = Math.max(maxBottom, y + needed)
+        }
+
+        if (maxBottom <= height - margin) return items
+
+        const span = maxBottom - top
+        const scale = span > 0 ? (height - margin - top) / span : 1
+        if (!(scale > 0.2)) break
+        const step = Math.min(0.95, Math.max(0.5, scale))
+        texts.forEach((item) => {
+            if (item.font?.size) item.font.size = Math.max(8, item.font.size * step)
+            item.bounds.origin.y = top + (item.bounds.origin.y - top) * step
+        })
+    }
+
+    return items
+}
+
 function getItems(baseSlide: any): any[] {
     const elements = (baseSlide?.elements || []).filter((e: any, i: number, all: any[]) => !isStackedTwin(e, i, all))
     const order = baseSlide?.elementBuildOrder
@@ -1022,13 +1138,17 @@ function getItems(baseSlide: any): any[] {
         const fill = element.fill
         const mediaUrl = fill?.media?.url?.absoluteString || ""
         const opacity = typeof element.opacity === "number" ? element.opacity : 1
+        const decoded = (decodeRTF(element.text?.rtfData) || "").trim()
         if (mediaUrl) out.push({ kind: "media", bounds, src: mediaUrl, opacity })
-        // A color fill is only a real drawn box when explicitly enabled; unset means the element fill is not shown
-        // (e.g. blue text elements) and the text carries its own color.
-        else if (fill?.color && fill.enable === true && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), opacity })
-        const decoded = decodeRTF(element.text?.rtfData)
-        if (decoded && decoded.trim()) out.push(getItem(e))
+        // A filled plate is only drawn for an element that has no text of its own: those carries-back boxes are
+        // the badge discs. A text element's fill is its glyph colour source, not a painted rectangle.
+        else if (!decoded && fill?.color && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), round: true, opacity })
+        if (decoded) out.push(getItem(e))
     })
+
+    // ProPresenter renders each block at its stored position and wraps only when the text genuinely needs it.
+    // Re-laying the slide out (shifting rows apart, scaling the column) moved blocks off the designer's grid and
+    // scrambled the numbered list, so the file's own geometry is what we render.
     return out
 }
 
@@ -1088,7 +1208,19 @@ function getItem(item: any) {
     return {
         kind: "text",
         bounds: element.bounds,
-        text: decodeRTF(element.text?.rtfData),
+        // Trim every line. RTF carries trailing spaces after each run; a trailing space that does not fit the box
+        // wraps onto a second, empty line, which makes the block one line taller than its box and pushes it into
+        // the row below. That was the visible "clashing" on the announcement decks.
+        // ProPresenter's own text settings. Bottom anchoring is what keeps a block clear of the one below it;
+        // ignoring it made tall titles hang down into their subtitles. Transform SINGLE_LINE means no wrapping.
+        verticalAlign: element.text?.verticalAlignment === 1 ? "middle" : element.text?.verticalAlignment === 2 ? "flex-end" : "flex-start",
+        singleLine: element.text?.transform === 1,
+        fillColor: element.fill?.color ? fillColorValue(element.fill.color) : "",
+        text: (decodeRTF(element.text?.rtfData) || "")
+            .split("\n")
+            .map((line) => line.replace(/\s+$/, "").trimStart())
+            .join("\n")
+            .replace(/\n+$/, ""),
         font: font
             ? (() => {
                   const face = resolveFace(font.family || font.name || "", !!font.bold)
