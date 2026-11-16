@@ -160,3 +160,31 @@ p {
 .isOptimized {
     backdrop-filter: none !important;
 }
+
+
+/* ProPresenter single line text boxes: the line is squeezed to the box width, never wrapped. Set by the
+   .pro converter with --pp-nowrap on the item, because the wrapped child line element overrides inherited
+   white-space. */
+.item[style*="--pp-nowrap"] {
+    /* The squeeze is a transform, which runs after layout, so the untransformed line would still be clipped by
+       the box. Let it paint: it is already condensed to the box width. */
+    overflow: visible !important;
+}
+.item[style*="--pp-nowrap"] .break {
+    white-space: pre !important;
+    text-wrap: unset !important;
+    overflow-wrap: normal !important;
+}
+
+/* ProPresenter anchors a text block inside its box (usually bottom). The .lines child in the textbox component
+   centres its content, so the anchor has to be applied there. */
+.item[style*="--pp-valign-bottom"] .lines {
+    justify-content: flex-end !important;
+    height: 100% !important;
+    min-height: 100% !important;
+}
+.item[style*="--pp-valign-middle"] .lines {
+    justify-content: center !important;
+    height: 100% !important;
+    min-height: 100% !important;
+}

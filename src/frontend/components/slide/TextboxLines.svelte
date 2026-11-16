@@ -397,6 +397,7 @@
                                     <div
                                         class="break"
                                         class:normalWrap={normalWrap || (isStage ? typeof stageItem?.style === "string" && (stageItem?.style.includes("justify") || stageItem?.style.includes("nowrap")) : line.align?.includes("justify") || line.align?.includes("left") || JSON.stringify(line).includes("nowrap"))}
+                                        class:oneLine={!!line.keep}
                                         class:reveal={(centerPreview || isStage) && item?.lineReveal && revealed < i}
                                         class:smallFontSize={smallFontSize || customFontSize || textAnimation.includes("font-size")}
                                         style="position: relative;{style ? lineStyle : ''}{style ? line.align : ''}{height ? `height: ${height}px;` : ''}{item?.list?.enabled && line.text?.reduce((value, t) => (value += t.value || ''), '')?.length ? listStyle : ''}{item?.list?.enabled ? `color: ${getStyles(line.text?.[0]?.style).color || ''};` : ''}{lineHidden && outputStyle?.showAsFaded ? `opacity: ${(outputStyle.lineOpacity ?? 50) / 100};` : ''}"
@@ -538,6 +539,15 @@
     /* normal wrap if "Text on one line (nowrap)" or Justify aligned */
     .break.normalWrap {
         text-wrap: unset;
+    }
+
+    /* A converted ProPresenter box that only fits one line keeps that line whole. The parent item carries the
+       marker, and the size has already been fitted to the visible width by the converter. */
+    .break.oneLine,
+    :global(.item[style*="--pp-nowrap"]) .break {
+        text-wrap: unset;
+        white-space: pre;
+        overflow-wrap: normal;
     }
 
     .lines .break.reveal {

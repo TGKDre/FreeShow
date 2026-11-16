@@ -844,9 +844,10 @@ function convertItem(item: any): Item {
     }
     const align: string = item.align || ""
     const textLines = ((item.text as string) || "").split("\n")
+    const oneLine = isOneLineBox(item)
     return {
         style: getItemStyle(item),
-        lines: textLines.map((lineText) => ({ align, text: [{ value: lineText, style: "" }] }))
+        lines: textLines.map((lineText) => ({ align, keep: oneLine, text: [{ value: lineText, style: "" }] }))
     }
 }
 
@@ -910,6 +911,17 @@ function boxStyle(bounds: any, opacity?: number): string {
     return s
 }
 
+// A box whose height only fits a single line, and whose text has no line breaks of its own: ProPresenter keeps such
+// a line whole and squeezes it to the box width rather than wrapping it into the row below.
+function isOneLineBox(item: any): boolean {
+    const box = item?.bounds?.size
+    const font = item?.font
+    if (!box?.height || !font?.size) return false
+    if (textLinesOf(item).length > 1) return false
+    const leading = Math.min(1.15, Math.max(1, font.lineHeight || 1))
+    return Math.floor((box.height * 0.96) / (font.size * leading)) <= 1
+}
+
 function getItemStyle(item: any): string {
     const bounds = item.bounds
     const pos = bounds?.origin
@@ -932,22 +944,22 @@ function getItemStyle(item: any): string {
         const fontPx = Math.max(1, Math.round(font.size))
         extra += `font-size:${fontPx}px;`
 
-        // A box that only holds one line is a title, and ProPresenter keeps its height while squeezing the line
-        // horizontally to the box width (it never wraps a title). Transforms apply after layout, so the line has to
-        // be told not to wrap first, then condensed.
+        // Fit the line to the width that is actually visible. A CSS transform runs after layout, so a condensed line
+        // was still clipped at the box edge; shrinking the type is the only thing that reliably keeps every word on
+        // screen. The box height still caps the size, and a box with room for two lines is allowed to wrap.
         if (hasBox && size.width > 0) {
             const leading = Math.min(1.15, Math.max(1, font?.lineHeight || 1))
-            const maxLines = Math.max(1, Math.floor((size.height * 0.96) / (font.size * leading)))
+            const roomFor = Math.max(1, Math.floor((size.height * 0.96) / (Math.max(1, Math.round(font.size)) * leading)))
             const longestLine = textLinesOf(item).reduce((a, b) => (b.length > a.length ? b : a), "")
-            const advance = font.caps ? 0.7 : String(font.weight) === "900" || String(font.weight) === "800" || font.bold ? 0.72 : 0.58
-            const needed = Math.max(1, longestLine.length) * advance * fontPx
-            if (maxLines === 1) {
-                extra += "white-space:pre;"
-                if (needed > size.width * 0.98) {
-                    const squeeze = (size.width * 0.98) / needed
-                    extra += `transform:scaleX(${squeeze.toFixed(3)});transform-origin:0 ${item.verticalAlign === "flex-end" ? "100%" : "0"};`
-                }
-            }
+            // Measured from the DOM: this face runs about 0.54em per character, not the 0.72 a synthetic bold
+            // assumption gives, which was shrinking every title far below its designed size.
+            const advance = font.caps ? 0.66 : String(font.weight) === "900" || String(font.weight) === "800" || font.bold ? 0.55 : 0.5
+            const visible = Math.max(40, Math.min(size.width, (item.slideWidth || 1920) - pos.x))
+            const characters = Math.max(1, longestLine.length)
+            let fitted = fontPx
+            while (fitted > 12 && characters * advance * fitted > visible * 0.98 * roomFor) fitted--
+            if (fitted !== fontPx) extra = extra.replace(`font-size:${fontPx}px;`, `font-size:${fitted}px;`)
+            if (roomFor === 1) extra += "--pp-nowrap:1;"
         }
         // ProPresenter lays a line out in exactly the font size, so its boxes were spaced for cap height with no
         // extra leading. Any added leading pushes each block down into the next one, which is the clash.
@@ -956,9 +968,8 @@ function getItemStyle(item: any): string {
     const fontWeight = font?.weight || (font?.bold ? "bold" : "")
     if (fontWeight) extra += `font-weight:${fontWeight};`
     if (font?.caps) extra += `text-transform:uppercase;`
-    if (item.verticalAlign && item.verticalAlign !== "flex-start") {
-        extra += `display:flex;flex-direction:column;justify-content:${item.verticalAlign};`
-    }
+    if (item.verticalAlign === "flex-end") extra += "--pp-valign-bottom:1;"
+    else if (item.verticalAlign === "middle") extra += "--pp-valign-middle:1;"
     if (item.singleLine) extra += "white-space:pre;"
     if (item.color) extra += `color:${item.color};`
     if (item.align) extra += `text-align:${item.align};`
@@ -1143,7 +1154,13 @@ function getItems(baseSlide: any): any[] {
         // A filled plate is only drawn for an element that has no text of its own: those carries-back boxes are
         // the badge discs. A text element's fill is its glyph colour source, not a painted rectangle.
         else if (!decoded && fill?.color && (fill.color.alpha ?? 1) > 0) out.push({ kind: "shape", bounds, color: fillColorValue(fill.color), round: true, opacity })
-        if (decoded) out.push(getItem(e))
+        if (decoded) {
+            const built = getItem(e)
+            // A text box can extend past the right edge of the slide; the frame is what clips it, so the squeeze
+            // has to fit the visible width, not the box width.
+            built.slideWidth = baseSlide?.size?.width || 1920
+            out.push(built)
+        }
     })
 
     // ProPresenter renders each block at its stored position and wraps only when the text genuinely needs it.
@@ -1213,8 +1230,14 @@ function getItem(item: any) {
         // the row below. That was the visible "clashing" on the announcement decks.
         // ProPresenter's own text settings. Bottom anchoring is what keeps a block clear of the one below it;
         // ignoring it made tall titles hang down into their subtitles. Transform SINGLE_LINE means no wrapping.
-        verticalAlign: element.text?.verticalAlignment === 1 ? "middle" : element.text?.verticalAlignment === 2 ? "flex-end" : "flex-start",
-        singleLine: element.text?.transform === 1,
+        // The decoder can hand these back as numbers or as enum names, so accept both.
+        verticalAlign: (() => {
+            const va = element.text?.verticalAlignment
+            if (va === 2 || /BOTTOM/i.test(String(va))) return "flex-end"
+            if (va === 1 || /MIDDLE/i.test(String(va))) return "middle"
+            return "flex-start"
+        })(),
+        singleLine: element.text?.transform === 1 || /SINGLE_LINE/i.test(String(element.text?.transform)),
         fillColor: element.fill?.color ? fillColorValue(element.fill.color) : "",
         text: (decodeRTF(element.text?.rtfData) || "")
             .split("\n")
@@ -1238,6 +1261,8 @@ function getItem(item: any) {
         // Text color: the text's own solid fill only when it carries real RGB; an alpha-only fill means "unset",
         // in which case the glyph color is the element fill color (common in these files).
         color: (() => {
+            const fromRtf = rtfTextColor(element.text?.rtfData)
+            if (fromRtf) return fromRtf
             const tsf = attributes.textSolidFill
             const hasRgb = !!(tsf && (tsf.red != null || tsf.green != null || tsf.blue != null))
             if (hasRgb) return fillColorValue(tsf)
@@ -1275,6 +1300,29 @@ function fontFamilyCss(name: string) {
 function decodeRTF(text: string): string {
     if (!text) return ""
     return RTFToText(decodeBase64(text))
+}
+
+// The glyph colour is written in the RTF header color table, not in the element attributes. Those attributes only
+// carry an alpha stub, which is why the badge digits came out in the element fill colour (blue) instead of black.
+function rtfTextColor(text: string): string {
+    if (!text) return ""
+    const rtf = decodeBase64(text)
+    if (!rtf) return ""
+
+    const table = rtf.match(/\\colortbl;([^}]*)}/)
+    if (!table) return ""
+    const entries: { r: number; g: number; b: number }[] = []
+    const re = /\\red(\d+)\\green(\d+)\\blue(\d+)/g
+    let match: RegExpExecArray | null
+    while ((match = re.exec(table[1]))) entries.push({ r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) })
+    if (!entries.length) return ""
+
+    // RTF colour indexes start at 1. Use the first \cf in the body, else the first table entry.
+    const body = rtf.slice(table.index || 0)
+    const cf = body.match(/\\cf(\d+)/)
+    const index = cf ? Number(cf[1]) : 1
+    const chosen = entries[Math.max(1, index) - 1] || entries[0]
+    return `rgb(${chosen.r}, ${chosen.g}, ${chosen.b})`
 }
 
 function getColorValue(color: { red: number; green: number; blue: number; alpha: number }): string {
