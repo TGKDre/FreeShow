@@ -848,21 +848,65 @@ function convertItem(item: any): Item {
     }
 }
 
-function normalizeFamily(name: string): string {
-    // Any CMG Sans face ("CMG Sans", "CMGSans-BoldCAPS", ... ) -> the installed family name Windows/CSS will match.
+// ProPresenter stores PostScript FACE names ("Quicksand-Light", "Arial-Black", "Helvetica-Bold", "ArialMT",
+// "CMGSans-BoldCAPS"). CSS matches on a FAMILY name plus a separate weight; using the PostScript name as the
+// family silently falls back to another face, so glyph widths and line heights drift and dense slides collide.
+const FACE_STYLES: Record<string, string> = {
+    thin: "100",
+    extralight: "200",
+    ultralight: "200",
+    light: "300",
+    regular: "400",
+    book: "400",
+    normal: "400",
+    medium: "500",
+    semibold: "600",
+    demibold: "600",
+    bold: "bold",
+    black: "900",
+    heavy: "900"
+}
+const POSTSCRIPT_FACES: Record<string, { family: string; weight?: string }> = {
+    "quicksand-light": { family: "Quicksand", weight: "300" },
+    "quicksand-regular": { family: "Quicksand", weight: "400" },
+    "quicksand-medium": { family: "Quicksand", weight: "500" },
+    "quicksand-semibold": { family: "Quicksand", weight: "600" },
+    "quicksand-bold": { family: "Quicksand", weight: "700" },
+    arialmt: { family: "Arial" },
+    arial: { family: "Arial" },
+    "arial-boldmt": { family: "Arial", weight: "bold" },
+    "arial-black": { family: "Arial Black" },
+    "arial-black-bold": { family: "Arial Black" },
+    helvetica: { family: "Helvetica" },
+    "helvetica-bold": { family: "Helvetica", weight: "bold" },
+    "helvetica neue": { family: "Helvetica Neue" },
+    impact: { family: "Impact" }
+}
+function resolveFace(name: string, bold?: boolean): { family: string; weight?: string } {
     const n = String(name || "").trim()
-    return /CMG\s*Sans/i.test(n) ? "CMG Sans" : n
+    const known = POSTSCRIPT_FACES[n.toLowerCase()]
+    if (known) return bold && !known.weight ? { ...known, weight: "bold" } : known
+    // Any CMG Sans face maps to the installed family; a CAPS face is emulated with text-transform.
+    if (/CMG\s*Sans/i.test(n)) return { family: "CMG Sans", weight: bold ? "bold" : undefined }
+    // Unknown PostScript names: split a trailing style token (Foo-Light -> Foo + 300).
+    const match = n.match(/^(.+?)[-\s](thin|extralight|ultralight|light|regular|book|normal|medium|semibold|demibold|bold|black|heavy)$/i)
+    if (match) {
+        const family = match[1].replace(/[-\s]+$/, "").trim()
+        const weight = FACE_STYLES[match[2].toLowerCase()]
+        return { family: family || n, weight: bold ? "bold" : weight }
+    }
+    return { family: n, weight: bold ? "bold" : undefined }
 }
 
 let _measureCanvas: HTMLCanvasElement | null = null
-function measureTextWidth(text: string, fontPx: number, family: string, bold: boolean, caps: boolean): number {
+function measureTextWidth(text: string, fontPx: number, family: string, weight: string, caps: boolean): number {
     try {
         if (typeof document === "undefined" || !text) return 0
         if (!_measureCanvas) _measureCanvas = document.createElement("canvas")
         const ctx = _measureCanvas.getContext("2d")
         if (!ctx) return 0
         const sample = caps ? text.toUpperCase() : text
-        ctx.font = `${bold ? "bold " : ""}${fontPx}px ${fontFamilyCss(family)}`
+        ctx.font = `${weight || "400"} ${fontPx}px ${fontFamilyCss(family)}`
         return ctx.measureText(sample).width
     } catch {
         return 0
@@ -889,7 +933,12 @@ function getItemStyle(item: any, textLines: string[] = []): string {
     const font = item.font
     if (font?.family) extra += `font-family:${fontFamilyCss(font.family)};`
     if (font?.size) {
-        const desired = Math.round(font.size * (96 / 72))
+        // ProPresenter expresses font size in the same units as the slide geometry (a 1920x1080 slide),
+        // so 1pt here equals 1 FreeShow px. The church decks prove it: a two line 39pt date block only
+        // fits its 96 unit box at 1:1 (2 x 39 x 1.2 = 94), and a 50pt badge digit only fits its 61 unit
+        // badge box at 1:1. Scaling by 96/72 (as if these were print points) made every line 33 percent
+        // too large, so blocks overflowed their boxes and clashed with the rows above and below them.
+        const desired = Math.max(1, Math.round(font.size))
         let fontPx = desired
         // ProPresenter shrinks text to fit its box. Measure real rendered width and step the size down until the
         // longest line fits the box, so nothing wraps and pushes a line out of the box (which clips it).
@@ -897,18 +946,27 @@ function getItemStyle(item: any, textLines: string[] = []): string {
             const nonEmpty = textLines.filter((l) => l.trim())
             const n = Math.max(1, nonEmpty.length)
             const longest = textLines.reduce((a, b) => (b.length > a.length ? b : a), "")
+            const weight = font.weight || (font.bold ? "bold" : "400")
             let byWidth = desired
-            if (measureTextWidth(longest, desired, font.family, font.bold, font.caps) > 0) {
-                while (byWidth > 18 && measureTextWidth(longest, byWidth, font.family, font.bold, font.caps) > size.width * 0.94) byWidth--
+            if (measureTextWidth(longest, desired, font.family, weight, font.caps) > 0) {
+                while (byWidth > 18 && measureTextWidth(longest, byWidth, font.family, weight, font.caps) > size.width * 0.94) byWidth--
             }
-            const byHeight = Math.floor((size.height * 0.96) / (n * 1.2))
+            const byHeight = Math.floor((size.height * 0.96) / (n * (font.lineHeight || 1)))
             fontPx = Math.max(18, Math.min(desired, byWidth, byHeight))
         }
         extra += `font-size:${fontPx}px;`
-        extra += "line-height:1.2;"
+        // ProPresenter's paragraphStyle.lineHeightMultiple is 1 in these decks, and its line box is the font size
+        // itself. CSS line-height 1.2 added 20 percent per line, which pushed a subtitle up into the title above it
+        // (visible as touching lines on dense announcement rows).
+        extra += `line-height:${font?.lineHeight || 1};`
+        // ProPresenter text boxes keep the designer's own line breaks and do not re-wrap; letting CSS wrap
+        // splits a line into two, which pushes the block past its box and into the row below. The font is
+        // already measured and shrunk to fit the box width, so nothing needs to wrap.
+        extra += "white-space:pre;"
     }
-    if (font?.bold) extra += "font-weight:bold;"
-    if (font?.caps) extra += "text-transform:uppercase;"
+    const fontWeight = font?.weight || (font?.bold ? "bold" : "")
+    if (fontWeight) extra += `font-weight:${fontWeight};`
+    if (font?.caps) extra += `text-transform:uppercase;`
     if (item.color) extra += `color:${item.color};`
     if (item.align) extra += `text-align:${item.align};`
 
@@ -942,12 +1000,12 @@ function getGroups(cueGroups: any): Record<string, any> {
 }
 
 function getItems(baseSlide: any): any[] {
-    const elements = baseSlide?.elements || []
+    const elements = (baseSlide?.elements || []).filter((e: any, i: number, all: any[]) => !isStackedTwin(e, i, all))
     const order = baseSlide?.elementBuildOrder
     let els = elements.map((e: any, i: number) => ({ e, i, uuid: e?.element?.uuid?.string }))
     if (Array.isArray(order) && order.length) {
         const rank = new Map<any, number>()
-        order.forEach((o: any, idx: number) => rank.set(o && typeof o === "object" ? o.string ?? o : o, idx))
+        order.forEach((o: any, idx: number) => rank.set(o && typeof o === "object" ? (o.string ?? o) : o, idx))
         els = [...els].sort((a, b) => {
             const ra = rank.has(a.uuid) ? (rank.get(a.uuid) as number) : rank.has(a.i) ? (rank.get(a.i) as number) : a.i
             const rb = rank.has(b.uuid) ? (rank.get(b.uuid) as number) : rank.has(b.i) ? (rank.get(b.i) as number) : b.i
@@ -972,6 +1030,34 @@ function getItems(baseSlide: any): any[] {
         if (decoded && decoded.trim()) out.push(getItem(e))
     })
     return out
+}
+
+// ProPresenter keeps near identical twin text elements a few pixels apart (a copy left behind when the
+// designer edits one of a stacked pair, and out/in build states). Painting both draws the same words twice
+// and reads as doubled, clashing text. ProPresenter arrays elements FRONT to BACK, so the first element of a
+// twin pair is the one actually visible; drop the later duplicates and keep the front one.
+const TWIN_TOLERANCE = 10
+function isStackedTwin(element: any, index: number, all: any[]): boolean {
+    const el = element?.element
+    if (!el?.text?.rtfData) return false
+    const text = (decodeRTF(el.text.rtfData) || "").trim()
+    if (!text) return false
+    const a = el.bounds?.origin
+    const as = el.bounds?.size
+    if (!a || !as) return false
+
+    for (let i = 0; i < index; i++) {
+        const other = all[i]?.element
+        if (!other?.text?.rtfData) continue
+        if ((decodeRTF(other.text.rtfData) || "").trim() !== text) continue
+        const b = other.bounds?.origin
+        const bs = other.bounds?.size
+        if (!b || !bs) continue
+        const samePlace = Math.abs((a.x || 0) - (b.x || 0)) <= TWIN_TOLERANCE && Math.abs((a.y || 0) - (b.y || 0)) <= TWIN_TOLERANCE && Math.abs((as.width || 0) - (bs.width || 0)) <= TWIN_TOLERANCE && Math.abs((as.height || 0) - (bs.height || 0)) <= TWIN_TOLERANCE
+        if (samePlace) return true
+    }
+
+    return false
 }
 
 function getSlides(cues: any): Record<string, any> {
@@ -1004,12 +1090,18 @@ function getItem(item: any) {
         bounds: element.bounds,
         text: decodeRTF(element.text?.rtfData),
         font: font
-            ? {
-                  family: normalizeFamily(font.family || font.name || ""),
-                  size: font.size || 0,
-                  bold: !!font.bold,
-                  caps: /CAPS/i.test(String(font.face || "")) || /CAPS/i.test(String(font.name || ""))
-              }
+            ? (() => {
+                  const face = resolveFace(font.family || font.name || "", !!font.bold)
+                  const multiple = Number(attributes.paragraphStyle?.lineHeightMultiple)
+                  return {
+                      family: face.family,
+                      weight: face.weight || "",
+                      size: font.size || 0,
+                      bold: !!font.bold,
+                      lineHeight: multiple > 0 ? multiple : 1,
+                      caps: /CAPS/i.test(String(font.face || "")) || /CAPS/i.test(String(font.name || ""))
+                  }
+              })()
             : null,
         // Text color: the text's own solid fill only when it carries real RGB; an alpha-only fill means "unset",
         // in which case the glyph color is the element fill color (common in these files).
