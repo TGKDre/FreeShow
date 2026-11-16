@@ -2,22 +2,24 @@ import type { Themes } from "../../../../types/Settings"
 
 export const defaultThemes: { [key: string]: Themes } = {
     default: {
-        name: "default",
+        // BLW Grace City house theme: black surfaces, metallic gold accent.
+        // Gold sampled from the ministry artwork: mid #d6ae31, highlight #f3ce3c.
+        name: "Grace City",
         default: true,
         font: {
             family: "",
             size: "1em"
         },
         colors: {
-            primary: "#242832",
-            "primary-lighter": "#2f3542",
-            "primary-darker": "#191923",
-            "primary-darkest": "#12121c",
-            text: "#f0f0ff",
+            primary: "#17181a",
+            "primary-lighter": "#24262a",
+            "primary-darker": "#111214",
+            "primary-darkest": "#0a0a0b",
+            text: "#f6f1e4",
             textInvert: "#131313",
-            "secondary-text": "#f0f0ff",
-            secondary: "#F0008C",
-            "secondary-opacity": "rgba(240, 0, 140, 0.5)",
+            "secondary-text": "#141414",
+            secondary: "#d6ae31",
+            "secondary-opacity": "rgba(214, 174, 49, 0.5)",
             hover: "rgb(255 255 255 / 0.05)",
             focus: "rgb(255 255 255 / 0.1)"
         }

@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>FreeShow - Loading</title>
+        <title>Grace City Presenter - Loading</title>
 
         <link rel="stylesheet" href="global.css" />
 
@@ -15,9 +15,8 @@
             }
 
             main {
-                /* background-color: var(--primary); */
-                background-color: #28276d;
-                background: linear-gradient(140deg, #28276d 20%, #150f30);
+                background-color: #0a0a0b;
+                background: radial-gradient(120% 100% at 50% 0%, #241f14 0%, #0d0d0e 55%, #050506 100%);
                 width: 100%;
                 height: 100%;
                 border-radius: var(--radius);
@@ -33,25 +32,14 @@
             }
 
             img {
-                height: calc(100% - var(--loader-height));
-                width: 42%;
-                object-fit: cover;
-                object-position: top left;
-
-                left: 0;
-                /* max-width: 40%; */
-                position: absolute;
-                top: var(--loader-height);
-
-                border-bottom-left-radius: var(--radius);
-                border-top-right-radius: var(--radius);
+                width: 54%;
+                max-height: 34%;
+                object-fit: contain;
+                margin: 0 auto;
             }
 
             .text {
-                position: absolute;
-                right: 0;
-                width: 58%;
-
+                width: 100%;
                 text-align: center;
             }
 
@@ -62,7 +50,7 @@
 
             h1 {
                 font-size: 3em;
-                background: -webkit-linear-gradient(340deg, var(--secondary), #ef4684);
+                background: -webkit-linear-gradient(340deg, #f3ce3c, var(--secondary) 55%, #a8851f);
                 background-clip: text;
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
@@ -128,10 +116,10 @@
         </div>
 
         <main>
-            <img src="./assets/startup.webp" alt="Loading..." draggable="false" />
+            <img src="./brand/gracecity-logo.png" alt="BLW Grace City" draggable="false" />
 
             <div class="text">
-                <h1>FreeShow</h1>
+                <h1>Presenter</h1>
                 <p class="v">v<span class="version">0.0.0</span></p>
             </div>
         </main>

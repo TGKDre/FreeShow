@@ -126,8 +126,6 @@
     {#if $ai.enabled}
         <AiFloating />
     {/if}
-
-    <Tipbar />
 </div>
 
 <style>

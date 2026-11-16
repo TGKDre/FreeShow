@@ -24,8 +24,9 @@
 
 <div style="text-align: center;">
     <div class="logo">
-        <img style="height: 35px;" src="./import-logos/freeshow.webp" alt="FreeShow-logo" draggable={false} />
-        <h1 style="color: var(--text);font-size: 1.7em;">FreeShow</h1>
+        <img style="height: 35px;" src="./brand/gracecity-logo.png" alt="BLW Grace City" draggable={false} />
+        <h1 style="color: var(--text);font-size: 1.7em;">Grace City Presenter</h1>
+        <p style="opacity: 0.7;font-size: 0.8em;margin-top: 4px;">Built on FreeShow by ChurchApps, GPL-3.0. Source: github.com/TGKDre/FreeShow</p>
     </div>
 
     <p style="font-size: 0.8em;margin-top: 2px;">

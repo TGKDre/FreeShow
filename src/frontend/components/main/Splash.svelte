@@ -47,7 +47,8 @@
 </script>
 
 <Center class="context #splash">
-    <h1>FreeShow</h1>
+    <img src="./brand/gracecity-logo.png" alt="BLW Grace City" style="width: min(420px, 60%);margin-bottom: 18px;" draggable={false} />
+    <h1>Grace City Presenter</h1>
     <p style="opacity: 0.7;">v{$version}</p>
     {#if $special.splashText}
         <p style="padding-top: 30px">

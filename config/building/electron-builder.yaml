@@ -1,5 +1,5 @@
-appId: app.freeshow
-productName: FreeShow
+appId: com.gracecity.presenter
+productName: Grace City Presenter
 artifactName: FreeShow-${version}-${arch}.${ext}
 
 files:
