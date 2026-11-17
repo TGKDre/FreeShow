@@ -1,6 +1,15 @@
 appId: com.gracecity.presenter
 productName: Grace City Presenter
-artifactName: FreeShow-${version}-${arch}.${ext}
+artifactName: GraceCityPresenter-${version}-${arch}.${ext}
+
+# GitHub Releases feed for OTA updates. electron-updater reads app-update.yml,
+# which electron-builder generates from this block, and checks this repo's
+# releases for a newer version.
+publish:
+    - provider: github
+      owner: TGKDre
+      repo: FreeShow
+      releaseType: draft
 
 files:
     - build/electron/**
@@ -34,11 +43,11 @@ win:
         - "**/node_modules/libspotifyctl/**/*"
         - "**/node_modules/openmediatransport/**"
         - "**/node_modules/sherpa-onnx-*/**"
-    azureSignOptions:
-        publisherName: Live Church Solutions
-        endpoint: https://wus2.codesigning.azure.net/
-        certificateProfileName: FreeShow
-        codeSigningAccountName: FreeShow
+    # Azure Trusted Signing pointed at FreeShow's account; disabled for Grace City
+    # builds (no FreeShow signing secrets). Windows installer is unsigned for now:
+    # OTA still works, first install shows a SmartScreen "unknown publisher" prompt.
+    # Add your own code-signing cert here later to remove that prompt.
+    azureSignOptions: null
 
 # linux
 
