@@ -84,3 +84,35 @@ as cleanup.
 
 Nothing in A or B needs a licence from Pewbeam or Spotifast, and neither binary is redistributed: they were
 read, not copied.
+
+## Status after implementation (2026-11-21)
+
+Shipped on the `grace-city` branch, each with tests and a green frontend and electron build:
+
+- **Synced lyrics** (`src/electron/utils/lrclib.ts`, `GET_SYNCED_LYRICS`): LRC parser, duration-aware
+  record picker, line lookup for a playback position, surfaced under the Spotify controls with
+  click-to-seek. 14 tests.
+- **Lyric recognition** (`src/frontend/ai/lyrics/`): transcript window scored against every lyric line of
+  the loaded shows, with a bigram bonus so verse and chorus stop being interchangeable; wired into
+  `AiManager` after scripture detection, with its own `ai.lyrics.confidence` setting that defaults to
+  ask. 18 tests.
+- **Greek and Hebrew lexicon** (`src/frontend/ai/lexicon/Lexicon.ts`, `public/lexicon/*.json`): the full
+  Open Scriptures Strong's set, 5,523 Greek and 8,674 Hebrew entries, lookup by number,
+  accent-insensitive transliteration, lemma or English definition, plus word-study slide formatting.
+  13 tests.
+- **Sermon notes archive** (`src/electron/data/sermonNotes.ts`, `SAVE/LIST/LOAD_SERMON_NOTE`): markdown
+  notes with outline, scriptures, devotionals and quiz, prompts for each, tolerant model-output
+  parsing, and a file-per-sermon archive under `Documents/FreeShow/Sermon Notes`. 17 tests.
+
+Correction to the earlier framing in this document: upstream FreeShow already had local speech to
+text (Nemotron through a worker) and the reference plus content verse matching with confidence
+scoring. The first draft of this proposal described those as gaps, which was wrong. The real gaps
+were lyrics recognition, the lexicon and the note archive, and those are the three that were built.
+
+Still open, in the order I would do them:
+
+1. UI surfaces for the lexicon lookup and the sermon note archive, and the LLM call that turns a
+   transcript into a note (prompts and parsing are done, the button is not).
+2. Devotional and quiz generation wired to the note, once the note UI exists.
+3. Announcement push to every screen and to members, reusing the existing socket and overlay paths.
+4. BibleShow cleanup: verse range per slide and a duration readout per item.
