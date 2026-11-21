@@ -90,6 +90,23 @@ describe("matching", () => {
         expect(matchSongs(index, "KING OF GLORY!")[0].slug).toBe("king-of-glory")
     })
 
+    it("finds a song by the line it opens with", () => {
+        const withOpening = [
+            { slug: "a-new-beginning", title: "A New Beginning", meta: "", opening: "There was a big star in the sky on that day" },
+            { slug: "king-of-glory", title: "King Of Glory", meta: "", opening: "Who is this King of glory" }
+        ]
+        expect(matchSongs(withOpening, "there was a big star")[0].slug).toBe("a-new-beginning")
+        expect(matchSongs(withOpening, "big star sky")[0].slug).toBe("a-new-beginning")
+    })
+
+    it("still prefers a title over a lyric line", () => {
+        const withOpening = [
+            { slug: "holy", title: "Holy", meta: "", opening: "Holy holy holy" },
+            { slug: "other", title: "Something Else", meta: "", opening: "You are holy Lord" }
+        ]
+        expect(matchSongs(withOpening, "holy")[0].slug).toBe("holy")
+    })
+
     it("returns nothing for an empty query or no match", () => {
         expect(matchSongs(index, "   ")).toEqual([])
         expect(matchSongs(index, "zzzz")).toEqual([])

@@ -45,7 +45,8 @@ function loadBundled() {
 
         for (const song of pack.songs || []) {
             if (!song?.slug) continue
-            songs.push({ slug: song.slug, title: song.title || song.slug, meta: song.meta || "" })
+            const opening = song.sections?.[0]?.lines?.[0] || ""
+            songs.push({ slug: song.slug, title: song.title || song.slug, meta: song.meta || "", opening })
             lyrics.set(song.slug, { slug: song.slug, title: song.title || song.slug, meta: song.meta || "", sections: song.sections || [] })
         }
 

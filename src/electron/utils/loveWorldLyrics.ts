@@ -10,6 +10,8 @@ export interface LoveWorldSongRef {
     slug: string
     title: string
     meta: string
+    /** First sung line, so a song can be found by how it starts rather than by its title. */
+    opening?: string
 }
 
 export interface LoveWorldSection {
@@ -136,7 +138,7 @@ function normalize(text: string): string {
         .trim()
 }
 
-/** Title matches, best first. Exact beats prefix beats every word present. */
+/** Title and opening line matches, best first. A title hit always outranks a lyric hit. */
 export function matchSongs(index: LoveWorldSongRef[], query: string, limit = 8): LoveWorldSongRef[] {
     const needle = normalize(query)
     if (!needle) return []
@@ -157,10 +159,18 @@ export function matchSongs(index: LoveWorldSongRef[], query: string, limit = 8):
                 score = hits ? Math.round((hits / words.length) * 30) : 0
             }
 
+            // falling back to the opening line: "there was a big star" should find the song even
+            // though nothing in the title says so, which is how a worship leader actually remembers it
+            if (score < 45 && song.opening) {
+                const opening = normalize(song.opening)
+                if (opening.includes(needle)) score = Math.max(score, 42)
+                else if (words.length > 1 && words.every((word) => opening.includes(word))) score = Math.max(score, 34)
+            }
+
             // a shorter title is a closer match when scores tie, so "Holy" beats "Holy Are You Lord"
             return { song, score: score ? score - Math.min(3, title.length / 40) : 0 }
         })
-        .filter((entry) => entry.score > 20)
+        .filter((entry) => entry.score > 25)
 
     return scored
         .sort((a, b) => b.score - a.score || a.song.title.localeCompare(b.song.title))

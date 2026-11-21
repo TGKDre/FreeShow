@@ -96,7 +96,93 @@ def parse_song(html: str):
     cut = max((index for index, line in enumerate(body) if line.strip().lower() == "lyrics"), default=-1)
     body = body[cut + 1:] if cut >= 0 else body
 
-    return [{"label": "Lyrics", "lines": body}] if len(body) > 1 else []
+    return stanzas_from_html(html, text, noise) or group_stanzas(body)
+
+
+def stanzas_from_html(html, text, noise):
+    """The unlabelled pages do bunch the words: one <p class="whitespace-pre-line"> per stanza."""
+    blocks = re.findall(r'<p class="whitespace-pre-line">(.*?)</p>', html, re.S)
+    stanzas = []
+
+    for block in blocks:
+        plain = unescape(re.sub(r"<[^>]+>", "", block))
+        lines = [part.strip() for part in re.split(r"\\n|\n", plain)]
+        lines = [line for line in lines if len(line) > 1 and not noise.match(line)]
+        if lines:
+            stanzas.append(lines)
+
+    if len(stanzas) < 2:
+        return []
+
+    # some pages put one line per paragraph, which leaves nothing to bunch: rebuild in fours
+    if sorted(len(stanza) for stanza in stanzas)[len(stanzas) // 2] <= 1:
+        flat_lines = [line for stanza in stanzas for line in stanza]
+        stanzas = [flat_lines[i:i + 4] for i in range(0, len(flat_lines), 4)]
+
+    counts = {}
+    for stanza in stanzas:
+        counts[" ".join(stanza).lower()] = counts.get(" ".join(stanza).lower(), 0) + 1
+
+    sections, verses, choruses = [], 0, 0
+    for stanza in stanzas:
+        repeated = counts[" ".join(stanza).lower()] > 1
+
+        if repeated:
+            choruses += 1
+            label = "Chorus" if choruses == 1 else f"Chorus {choruses}"
+        else:
+            verses += 1
+            label = f"Verse {verses}"
+        sections.append({"label": label, "lines": stanza})
+
+    return sections
+
+
+def group_stanzas(lines):
+    """Label a flat lyric block the way a song is actually bunched.
+
+    A stanza that comes back later is the chorus; the first appearance of each unrepeated stanza is a
+    verse, in order. That reproduces the grouping Grace City already made by hand in ProPresenter
+    without needing their binary files.
+    """
+    if len(lines) < 2:
+        return [{"label": "Lyrics", "lines": lines}]
+
+    # the page separates stanzas with <p> blocks; the flat list lost those, so rebuild on repetition:
+    # walk forward and cut a stanza every time the next line has already appeared earlier in the song
+    stanzas, current = [], []
+    seen = set()
+    for line in lines:
+        key = re.sub(r"[^a-z0-9 ]", "", line.lower()).strip()
+        if current and key in seen:
+            stanzas.append(current)
+            current = []
+        current.append(line)
+        seen.add(key)
+    if current:
+        stanzas.append(current)
+
+    # a single long stanza means the cut found nothing useful; "bunch" it into four line blocks
+    if len(stanzas) == 1 and len(lines) > 4:
+        stanzas = [lines[i:i + 4] for i in range(0, len(lines), 4)]
+
+    counts = {}
+    for stanza in stanzas:
+        key = " ".join(stanza).lower()
+        counts[key] = counts.get(key, 0) + 1
+
+    sections, verses, choruses = [], 0, 0
+    for stanza in stanzas:
+        key = " ".join(stanza).lower()
+        if counts[key] > 1:
+            choruses += 1
+            label = "Chorus" if choruses == 1 else f"Chorus {choruses}"
+        else:
+            verses += 1
+            label = f"Verse {verses}"
+        sections.append({"label": label, "lines": stanza})
+
+    return sections
 
 
 def main():
