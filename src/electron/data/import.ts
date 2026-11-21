@@ -15,11 +15,53 @@ import { filePathHashCode } from "./thumbnails"
 import { materializeMedia } from "./ppMedia"
 import { parsePlaylistContainer } from "./ppPlaylist"
 import { readThemeLibrary } from "./ppThemeImport"
+import { parseTimerContainer } from "./ppTimers"
+import { parseStageContainer } from "./ppStage"
+import { parsePropContainer } from "./ppProps"
 import { decompressZip, decompressZipStream, isZip } from "./zip"
 
 type FileData = { content: Buffer | string | object; path?: string; name?: string; extension?: string }
 
 const specialImports = {
+    propresenter_timers: async (files: string[]) => {
+        sendToMain(ToMain.ALERT, "popup.importing")
+        const data: FileData[] = []
+        for (const filePath of files) {
+            try {
+                const timers = parseTimerContainer(await readFileBufferAsync(filePath))
+                if (timers.length) data.push({ name: "timers", content: JSON.stringify({ timers }) })
+            } catch (err) {
+                console.error(`Timers could not be read (${filePath}):`, err)
+            }
+        }
+        return data
+    },
+    propresenter_stage: async (files: string[]) => {
+        sendToMain(ToMain.ALERT, "popup.importing")
+        const data: FileData[] = []
+        for (const filePath of files) {
+            try {
+                const layouts = parseStageContainer(await readFileBufferAsync(filePath))
+                if (layouts.length) data.push({ name: "stage", content: JSON.stringify({ layouts }) })
+            } catch (err) {
+                console.error(`Stage layouts could not be read (${filePath}):`, err)
+            }
+        }
+        return data
+    },
+    propresenter_props: async (files: string[]) => {
+        sendToMain(ToMain.ALERT, "popup.importing")
+        const data: FileData[] = []
+        for (const filePath of files) {
+            try {
+                const props = parsePropContainer(await readFileBufferAsync(filePath))
+                if (props.length) data.push({ name: "props", content: JSON.stringify({ props }) })
+            } catch (err) {
+                console.error(`Props could not be read (${filePath}):`, err)
+            }
+        }
+        return data
+    },
     propresenter_theme: async (files: string[]) => {
         sendToMain(ToMain.ALERT, "popup.importing")
 

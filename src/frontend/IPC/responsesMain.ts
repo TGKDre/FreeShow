@@ -40,6 +40,7 @@ import { addToProject, importProject, updateRecentlyAddedFiles } from "../conver
 import { convertProPresenter } from "../converters/propresenter"
 import { convertProPresenterPlaylists } from "../converters/propresenterPlaylist"
 import { convertProPresenterThemes } from "../converters/propresenterTheme"
+import { convertProPresenterProps, convertProPresenterStageLayouts, convertProPresenterTimers } from "../converters/propresenterConfiguration"
 import { convertQuelea } from "../converters/quelea"
 import { convertSoftProjector } from "../converters/softprojector"
 import { convertSongbeamerFiles } from "../converters/songbeamer"
@@ -662,6 +663,9 @@ export const mainResponses: MainResponses = {
             propresenter: () => convertProPresenter(data as { content: any; name: string; extension: string }[]),
             propresenter_playlist: () => convertProPresenterPlaylists(data),
             propresenter_theme: () => convertProPresenterThemes(data),
+            propresenter_timers: () => convertProPresenterTimers(data),
+            propresenter_stage: () => convertProPresenterStageLayouts(data),
+            propresenter_props: () => convertProPresenterProps(data),
             easyworship: () => convertEasyWorship(data),
             videopsalm: () => convertVideopsalm(data),
             openlp: () => convertOpenLP(data),

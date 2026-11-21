@@ -34,6 +34,24 @@
         { name: "Word", extensions: ["doc", "docx"], id: "word" },
         { name: "ProPresenter", extensions: ["pro4", "pro5", "pro6", "pro", "json", "proBundle"], id: "propresenter" },
         {
+            name: "ProPresenter Timers",
+            extensions: [],
+            id: "propresenter_timers",
+            tutorial: "Pick the file named <b>Timers</b> in <i>Documents/ProPresenter/Configuration</i>. Countdowns come across with their durations."
+        },
+        {
+            name: "ProPresenter Stage Layouts",
+            extensions: [],
+            id: "propresenter_stage",
+            tutorial: "Pick the file named <b>Stage</b> in <i>Documents/ProPresenter/Configuration</i>. Each layout becomes a stage layout with current and next slide, plus a timer item where the original had one."
+        },
+        {
+            name: "ProPresenter Props",
+            extensions: [],
+            id: "propresenter_props",
+            tutorial: "Pick the file named <b>Props</b> in <i>Documents/ProPresenter/Configuration</i>. Each prop becomes an overlay you can switch on over a slide."
+        },
+        {
             name: "ProPresenter Themes",
             extensions: [],
             id: "propresenter_theme",
