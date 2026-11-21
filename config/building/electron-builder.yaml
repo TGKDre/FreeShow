@@ -43,6 +43,8 @@ win:
         - "**/node_modules/libspotifyctl/**/*"
         - "**/node_modules/openmediatransport/**"
         - "**/node_modules/sherpa-onnx-*/**"
+        - "**/assets/bin/aero-peek-helper.exe"
+        - "**/assets/bin/hid-input-helper.exe"
     # Azure Trusted Signing pointed at FreeShow's account; disabled for Grace City
     # builds (no FreeShow signing secrets). Windows installer is unsigned for now:
     # OTA still works, first install shows a SmartScreen "unknown publisher" prompt.
