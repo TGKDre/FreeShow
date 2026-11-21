@@ -3,7 +3,8 @@
     import Icon from "../../helpers/Icon.svelte"
     import T from "../../helpers/T.svelte"
     import { Main } from "../../../../types/IPC/Main"
-    import { sendMain } from "../../../IPC/main"
+    import type { SyncedLyricLine } from "../../../../types/Main"
+    import { requestMain, sendMain } from "../../../IPC/main"
     import MaterialButton from "../../inputs/MaterialButton.svelte"
     import { destroySpotifyManager, fadePause, initSpotifyManager, seekTo, skipNext, skipPrev, spotifyIsFading, spotifyState, togglePlay } from "./SpotifyManager"
 
@@ -70,6 +71,44 @@
         if ($spotifyState) isFirstRun = false
         isPlaying = nextPlaying
         isFading = nextFading
+    }
+
+    // synced lyrics for whatever is playing, fetched from LRCLIB by track and duration
+    let lyricLines: SyncedLyricLine[] = []
+    let lyricsCacheKey = ""
+
+    $: trackKey = $spotifyState ? `${$spotifyState.title}|${$spotifyState.artist}|${Math.round($spotifyState.durationSec || 0)}` : ""
+    $: if (trackKey && trackKey !== lyricsCacheKey) loadSyncedLyrics(trackKey)
+
+    async function loadSyncedLyrics(key: string) {
+        lyricsCacheKey = key
+        if (!$spotifyState?.title) return
+
+        const result = await requestMain(Main.GET_SYNCED_LYRICS, {
+            title: $spotifyState.title,
+            artist: $spotifyState.artist,
+            durationMs: ($spotifyState.durationSec || 0) * 1000
+        })
+
+        // the track may have changed while this was in flight
+        if (lyricsCacheKey !== key) return
+        lyricLines = result?.lines || []
+    }
+
+    function lineAt(positionMs: number): number {
+        let index = -1
+        for (let i = 0; i < lyricLines.length; i++) {
+            if (lyricLines[i].timeMs <= positionMs) index = i
+            else break
+        }
+        return index
+    }
+
+    $: activeLyric = lyricLines.length && $spotifyState ? lyricLines[lineAt($spotifyState.positionSec * 1000)] : null
+
+    function seekToLyric() {
+        if (!activeLyric || $spotifyIsFading) return
+        seekTo(activeLyric.timeMs / 1000)
     }
 
     let isDragging = false
@@ -151,6 +190,12 @@
             </div>
             <span class="time">{formatTime($spotifyState.durationSec)}</span>
         </div>
+
+        {#if activeLyric?.text && !$spotifyIsFading}
+            <div class="lyrics" class:dimmed={isMinimized && !isHovering} on:click={seekToLyric} title="Jump to this line">
+                {activeLyric.text}
+            </div>
+        {/if}
 
         {#if $spotifyState.isPlaying}
             <div class="fade-btn-wrap" class:show-fade={isHovering || $spotifyIsFading}>
@@ -262,6 +307,31 @@
 
         width: 100%;
         margin-bottom: 2px;
+    }
+
+    .lyrics {
+        width: 100%;
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 1.3;
+        font-style: italic;
+        color: var(--text-1, #fff);
+        opacity: 0.85;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        transition: opacity 0.3s ease, max-height 0.3s ease;
+        max-height: 40px;
+    }
+
+    .lyrics.dimmed {
+        opacity: 0.45;
+    }
+
+    .lyrics:hover {
+        opacity: 1;
     }
 
     .progress {
