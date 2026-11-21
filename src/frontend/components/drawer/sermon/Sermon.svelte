@@ -29,9 +29,27 @@
         status = ""
     }
 
-    function transcriptText(): string {
+    // the transcript is editable before it is written into the archive: one misheard name would
+    // otherwise live in the note forever
+    let transcriptDraft = ""
+    let transcriptTouched = false
+
+    function liveTranscript(): string {
         const { finalized = "", unprocessed = "" } = $sttTranscript || {}
         return `${finalized} ${unprocessed}`.trim()
+    }
+
+    // follow the live transcript until somebody edits it, then leave their text alone
+    $: if (!transcriptTouched && $sttTranscript) transcriptDraft = liveTranscript()
+
+    function useLiveTranscript() {
+        transcriptTouched = false
+        transcriptDraft = liveTranscript()
+        status = transcriptDraft ? "Transcript reloaded." : "Speech to text has not produced anything yet."
+    }
+
+    function transcriptText(): string {
+        return (transcriptDraft || "").trim()
     }
 
     // request() already returns parsed JSON, but a provider that ignores the schema can still hand
@@ -191,8 +209,20 @@
     {:else if mode === "notes"}
         <div class="row">
             <MaterialButton icon="add" on:click={generateNote} disabled={busy}>Note from transcript</MaterialButton>
-            <MaterialButton icon="refresh" on:click={refreshNotes} disabled={busy}>Refresh</MaterialButton>
+            <MaterialButton icon="refresh" on:click={useLiveTranscript} disabled={busy}>Reload transcript</MaterialButton>
+            <MaterialButton icon="refresh" on:click={refreshNotes} disabled={busy}>Refresh notes</MaterialButton>
         </div>
+
+        <details class="transcript">
+            <summary>Transcript draft ({transcriptDraft.length} characters)</summary>
+            <textarea
+                class="search"
+                rows="8"
+                bind:value={transcriptDraft}
+                on:input={() => (transcriptTouched = true)}
+                placeholder="The transcript appears here once speech to text is running. Fix names and numbers before saving."
+            ></textarea>
+        </details>
 
         {#if status}<p class="status">{status}</p>{/if}
 
@@ -426,6 +456,21 @@
     .empty {
         font-size: 0.85em;
         opacity: 0.6;
+    }
+
+    .transcript {
+        font-size: 0.85em;
+    }
+
+    .transcript summary {
+        cursor: pointer;
+        opacity: 0.8;
+        margin-bottom: 4px;
+    }
+
+    .transcript textarea {
+        width: 100%;
+        resize: vertical;
     }
 
     .search {
