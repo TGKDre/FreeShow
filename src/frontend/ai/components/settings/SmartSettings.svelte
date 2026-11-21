@@ -4,6 +4,7 @@
     import { activePopup, ai, popupData, sttTempDisabled } from "../../../stores"
     import { translateText } from "../../../utils/language"
     import AutoScriptureOptions from "./AutoScriptureOptions.svelte"
+    import LyricsOptions from "./LyricsOptions.svelte"
     import STTOptions from "./STTOptions.svelte"
 
     $: isEnabled = $ai.enabled
@@ -31,7 +32,7 @@
 
     <AutoScriptureOptions />
 
-    <!-- TODO: auto lyrics & more -->
+    <LyricsOptions />
 {:else}
     <Tip type="info" value="ai.hint" top={20} />
     <Tip type="warning" value="ai.privacy_details" top={10} />

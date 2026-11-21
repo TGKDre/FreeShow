@@ -15,6 +15,10 @@ export interface MatchResult {
     scriptureMatchType?: "content"
     scriptureTranslation?: string
     scriptureIsNewTranslation?: boolean
+
+    // lyrics matches carry the show and line they came from
+    lyricsSongId?: string
+    lyricsLineIndex?: number
 }
 
 export interface AiSuggestion {

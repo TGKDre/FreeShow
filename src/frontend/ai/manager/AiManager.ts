@@ -5,10 +5,13 @@ import type { ConfidenceLevels } from "../../../types/ai/AiSettings"
 import { startScripture } from "../../components/actions/apiHelper"
 import { keysToID } from "../../components/helpers/array"
 import { getFirstActiveOutput } from "../../components/helpers/output"
+import { openShow } from "../../components/helpers/show"
 import { setActiveScripture } from "../../converters/bible"
 import { ai, aiSmartAction, aiSuggestions, drawerTabsData, outputs, scriptures } from "../../stores"
 import { newToast } from "../../utils/common"
 import { getLLMManager } from "../llm/llmManager"
+import { findLyricMatch } from "../lyrics/lyricDetector"
+import { getSongLibrary } from "../lyrics/songLibrary"
 import { BibleCacheManager } from "../scripture/BibleCacheManager"
 import { detectBibleVersion } from "../scripture/BibleVersionDetector"
 import { isReferenceWithin } from "../scripture/references"
@@ -53,7 +56,26 @@ export class AiManager {
         const scriptureVersionMatch = await detectBibleVersion(textChunk, isCancelled)
         if (scriptureVersionMatch) return scriptureVersionMatch
 
-        return null
+        return this.lyricDetection(textChunk)
+    }
+
+    private static lastLyricLine: { songId: string; lineIndex: number } | null = null
+    private static lyricDetection(textChunk: string) {
+        // scripture is checked first on purpose: worship lyrics are the fallback signal, not a competitor
+        const songs = getSongLibrary()
+        if (!songs.length) return null
+
+        const match = findLyricMatch(textChunk, songs, { excludeLine: this.lastLyricLine || undefined })
+        if (!match) return null
+
+        this.lastLyricLine = { songId: match.songId, lineIndex: match.lineIndex }
+        return {
+            type: "lyrics" as const,
+            content: match.title,
+            confidence: match.confidence,
+            lyricsSongId: match.songId,
+            lyricsLineIndex: match.lineIndex
+        }
     }
 
     private static isPreloadStarted: boolean = false
@@ -126,7 +148,7 @@ export class AiManager {
         if (match.type === "empty" || !match.content) return
         if (match.type === "scripture" && AiManager.liveContent === match.content) return
 
-        if (match.type !== "scripture" && match.type !== "scripture_version") return // WIP only scripture is implemented
+        if (match.type !== "scripture" && match.type !== "scripture_version" && match.type !== "lyrics") return
 
         let suggestionDraft: any = {
             id: uid(5),
@@ -153,6 +175,12 @@ export class AiManager {
             return
         }
 
+        if (match.type === "lyrics") {
+            const suggestion = { ...suggestionDraft, action: "open_show", trigger }
+            this.addSuggestion(suggestion)
+            return
+        }
+
         const suggestion = { ...suggestionDraft, action: "present", trigger }
         this.addSuggestion(suggestion)
     }
@@ -172,7 +200,17 @@ export class AiManager {
         if (match.confidence <= 95 && this.alreadySuggested(match)) return false
 
         if (match.type === "scripture_version") return false
-        if (match.type !== "scripture") return false // WIP currently only auto-plays scripture matches
+
+        if (match.type === "lyrics") {
+            // worship auto-advance off by default: a wrong guess mid-song is worse than a click
+            const lyricsConfidence = get(ai).lyrics?.confidence || "ask"
+            if (lyricsConfidence === "ask" || match.confidence <= 50) return false
+            const recent = this.lastOutputUpdate && Date.now() - this.lastOutputUpdate < this.MAX_AUTO_PLAY_INTERVAL
+            if (recent) return false
+            return match.confidence > this.getConfidenceScore(lyricsConfidence)
+        }
+
+        if (match.type !== "scripture") return false
 
         if (match.type === "scripture" && match.scriptureIsNewTranslation) return false
 
@@ -204,6 +242,9 @@ export class AiManager {
             if (match.scriptureTranslation) setActiveScripture(match.scriptureTranslation)
         } else if (match.type === "scripture") {
             startScripture({ reference: match.content })
+            this.outputUpdate(match.content)
+        } else if (match.type === "lyrics") {
+            if (match.lyricsSongId) openShow(match.lyricsSongId)
             this.outputUpdate(match.content)
         }
     }

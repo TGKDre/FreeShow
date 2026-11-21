@@ -4,6 +4,7 @@ export interface AiSettings {
     llm?: LlmSettings
 
     scripture?: AiScriptureSettings
+    lyrics?: AiLyricsSettings
 }
 
 interface SttSettings {
@@ -37,5 +38,10 @@ interface LlmSettings {
 
 export type ConfidenceLevels = "ask" | "highest" | "high" | "medium"
 interface AiScriptureSettings {
+    confidence?: ConfidenceLevels
+}
+
+/** Worship lyric recognition. Off unless a confidence level is chosen, since a wrong lyric is loud. */
+interface AiLyricsSettings {
     confidence?: ConfidenceLevels
 }
