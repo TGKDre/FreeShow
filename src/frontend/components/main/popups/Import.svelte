@@ -34,6 +34,12 @@
         { name: "Word", extensions: ["doc", "docx"], id: "word" },
         { name: "ProPresenter", extensions: ["pro4", "pro5", "pro6", "pro", "json", "proBundle"], id: "propresenter" },
         {
+            name: "ProPresenter Playlist",
+            extensions: [],
+            id: "propresenter_playlist",
+            tutorial: "Pick the file named <b>Library</b> (also <b>Media</b> or <b>Audio</b>) in <i>Documents/ProPresenter/Playlists</i>. It has no file extension, so open it directly. Import the presentations themselves first, then the playlist becomes a project in service order."
+        },
+        {
             name: "EasyWorship",
             extensions: ["db"],
             id: "easyworship",

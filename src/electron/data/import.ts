@@ -13,11 +13,29 @@ import { asyncPool, doesPathExist, getDataFolderPath, getExtension, getMediaSync
 import { detectFileType } from "./bibleDetecter"
 import { filePathHashCode } from "./thumbnails"
 import { materializeMedia } from "./ppMedia"
+import { parsePlaylistContainer } from "./ppPlaylist"
 import { decompressZip, decompressZipStream, isZip } from "./zip"
 
 type FileData = { content: Buffer | string | object; path?: string; name?: string; extension?: string }
 
 const specialImports = {
+    propresenter_playlist: async (files: string[]) => {
+        sendToMain(ToMain.ALERT, "popup.importing")
+
+        // The ProPresenter playlists file has no extension ("Library", "Media", "Audio"), so it is read as
+        // bytes and decoded by ppPlaylist, then handed to the renderer as JSON.
+        const data: FileData[] = []
+        for (const filePath of files) {
+            try {
+                const buf = await readFileBufferAsync(filePath)
+                const playlists = parsePlaylistContainer(buf)
+                if (playlists.length) data.push({ name: getFileName(filePath) || "playlists", content: JSON.stringify({ playlists }) })
+            } catch (err) {
+                console.error(`Error reading playlist "${filePath}":`, err)
+            }
+        }
+        return data
+    },
     powerpoint: async (files: string[]) => {
         sendToMain(ToMain.ALERT, "popup.importing")
 
