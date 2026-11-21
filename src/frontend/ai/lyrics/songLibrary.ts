@@ -35,6 +35,25 @@ export function lyricLinesFromShow(show: Pick<Show, "slides"> | undefined): stri
     return lines
 }
 
+/**
+ * Which slide holds the given lyric line. Line order here must match lyricLinesFromShow exactly,
+ * otherwise a detected line opens the wrong slide, which is worse than not moving at all.
+ */
+export function slideIdForLine(show: Pick<Show, "slides"> | undefined, lineIndex: number): string | null {
+    if (!show?.slides || lineIndex < 0) return null
+    let counter = -1
+    for (const [slideId, slide] of Object.entries(show.slides) as [string, Slide][]) {
+        for (const item of slide?.items || []) {
+            for (const line of item.lines || []) {
+                if (!lineText(line)) continue
+                counter++
+                if (counter === lineIndex) return slideId
+            }
+        }
+    }
+    return null
+}
+
 export function buildSongLibrary(loadedShows: { [id: string]: Pick<Show, "name" | "slides"> }): LyricSong[] {
     const songs: LyricSong[] = []
     for (const [id, show] of Object.entries(loadedShows || {})) {

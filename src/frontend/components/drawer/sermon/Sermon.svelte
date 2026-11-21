@@ -1,0 +1,418 @@
+<script lang="ts">
+    import type { LexiconEntry } from "../../../../types/ai/Lexicon"
+    import type { SermonNote } from "../../../../types/ai/Sermon"
+    import { Main } from "../../../../types/IPC/Main"
+    import { assembleNote, buildDevotionalPrompt, buildNotesPrompt, buildQuizPrompt, parseModelJson } from "../../../../types/ai/sermonFormat"
+    import { getLLMManager } from "../../../ai/llm/llmManager"
+    import { lookupAnywhere } from "../../../ai/lexicon/Lexicon"
+    import { requestMain } from "../../../IPC/main"
+    import { drawerTabsData, sttTranscript } from "../../../stores"
+    import MaterialButton from "../../inputs/MaterialButton.svelte"
+
+    export let active: string | null
+
+    let mode: "notes" | "study" = active === "study" ? "study" : "notes"
+    let status = ""
+    let busy = false
+
+    // --- sermon notes ---
+    let notes: { id: string; title: string; date: string }[] = []
+    let selected: SermonNote | null = null
+
+    async function refreshNotes() {
+        notes = (await requestMain(Main.LIST_SERMON_NOTES)) || []
+    }
+
+    async function openNote(id: string) {
+        selected = await requestMain(Main.LOAD_SERMON_NOTE, { id })
+        status = ""
+    }
+
+    function transcriptText(): string {
+        const { finalized = "", unprocessed = "" } = $sttTranscript || {}
+        return `${finalized} ${unprocessed}`.trim()
+    }
+
+    // request() already returns parsed JSON, but a provider that ignores the schema can still hand
+    // back a string, so both paths go through the same reader
+    function readModelResult(raw: any): any {
+        if (!raw) return null
+        return typeof raw === "string" ? parseModelJson(raw) : raw
+    }
+
+    async function saveNote(note: SermonNote, message: string) {
+        const saved = await requestMain(Main.SAVE_SERMON_NOTE, note)
+        await refreshNotes()
+        if (saved?.path) {
+            selected = note
+            status = message
+        } else status = "Could not write the note. Check the Sermon Notes folder."
+    }
+
+    async function generateNote() {
+        const transcript = transcriptText()
+        if (!transcript) {
+            status = "There is no transcript yet. Turn on speech to text and let it listen first."
+            return
+        }
+
+        const llm = getLLMManager()
+        if (!llm) {
+            status = "Choose an AI provider in Settings > AI first."
+            return
+        }
+
+        busy = true
+        status = "Reading the sermon..."
+        try {
+            const parsed = readModelResult(await llm.request<any>({ prompt: buildNotesPrompt(transcript) }))
+            if (!parsed) {
+                status = "The model did not return usable JSON. Try again, or with a stronger model."
+                return
+            }
+
+            const now = new Date()
+            const note = assembleNote({
+                id: "",
+                title: parsed.title || "Untitled sermon",
+                date: now.toISOString().slice(0, 10),
+                startedAt: now.getTime(),
+                endedAt: now.getTime(),
+                transcript,
+                summary: parsed.summary || "",
+                outline: parsed.outline || [],
+                scripture: parsed.scripture || [],
+                tags: parsed.tags || []
+            })
+            await saveNote(note, "Note saved.")
+        } finally {
+            busy = false
+        }
+    }
+
+    async function addDevotionals(days: number) {
+        if (!selected) return
+        const llm = getLLMManager()
+        if (!llm) return
+
+        busy = true
+        status = `Writing ${days} days...`
+        try {
+            const outline = selected.outline.map((section) => section.heading).join("; ")
+            const parsed = readModelResult(await llm.request<any>({ prompt: buildDevotionalPrompt(selected.summary, outline, days) }))
+            const devotionals = parsed?.devotionals
+            if (!Array.isArray(devotionals) || !devotionals.length) {
+                status = "The model did not return usable devotionals."
+                return
+            }
+            await saveNote({ ...selected, devotionals }, "Devotionals added.")
+        } finally {
+            busy = false
+        }
+    }
+
+    async function addQuiz(count: number) {
+        if (!selected) return
+        const llm = getLLMManager()
+        if (!llm) return
+
+        busy = true
+        status = "Writing questions..."
+        try {
+            const outline = selected.outline.map((section) => section.heading).join("; ")
+            const parsed = readModelResult(await llm.request<any>({ prompt: buildQuizPrompt(selected.summary, outline, count) }))
+            const quiz = parsed?.quiz
+            if (!Array.isArray(quiz) || !quiz.length) {
+                status = "The model did not return usable questions."
+                return
+            }
+            await saveNote({ ...selected, quiz }, "Quiz added.")
+        } finally {
+            busy = false
+        }
+    }
+
+    // --- word study ---
+    let query = ""
+    let results: LexiconEntry[] = []
+    let entry: LexiconEntry | null = null
+    let studyStatus = ""
+
+    async function search() {
+        const text = query.trim()
+        if (!text) return
+        studyStatus = "Looking..."
+        results = await lookupAnywhere(text)
+        entry = results[0] || null
+        studyStatus = results.length ? "" : "Nothing found. Try a Strong's number like G26 or a word."
+    }
+
+    function copy(text: string) {
+        navigator.clipboard?.writeText(text)
+        studyStatus = "Copied."
+    }
+
+    // the drawer assumes every tab id has an entry before it reads activeSubTab
+    drawerTabsData.update((a) => {
+        if (!a.sermon) a.sermon = { enabled: true, activeSubTab: null }
+        return a
+    })
+
+    refreshNotes()
+</script>
+
+<div class="sermon">
+    <div class="switch">
+        <button class:active={mode === "notes"} on:click={() => (mode = "notes")}>Sermon notes</button>
+        <button class:active={mode === "study"} on:click={() => (mode = "study")}>Word study</button>
+    </div>
+
+    {#if mode === "notes"}
+        <div class="row">
+            <MaterialButton icon="add" on:click={generateNote} disabled={busy}>Note from transcript</MaterialButton>
+            <MaterialButton icon="refresh" on:click={refreshNotes} disabled={busy}>Refresh</MaterialButton>
+        </div>
+
+        {#if status}<p class="status">{status}</p>{/if}
+
+        <div class="columns">
+            <div class="list">
+                {#each notes as note (note.id)}
+                    <button class="item" class:selected={selected?.id === note.id} on:click={() => openNote(note.id)}>
+                        <span class="date">{note.date}</span>
+                        <span class="title">{note.title}</span>
+                    </button>
+                {:else}
+                    <p class="empty">No notes yet. Turn on speech to text, then press Note from transcript.</p>
+                {/each}
+            </div>
+
+            <div class="detail">
+                {#if selected}
+                    <h3>{selected.title}</h3>
+                    <p class="meta">{selected.date}{selected.scripture?.length ? ` · ${selected.scripture.join(", ")}` : ""}</p>
+                    {#if selected.summary}<p class="summary">{selected.summary}</p>{/if}
+
+                    {#if selected.outline?.length}
+                        <ul class="outline">
+                            {#each selected.outline as section}
+                                <li>
+                                    <strong>{section.heading}</strong>
+                                    {#if section.points?.length}
+                                        <ul>
+                                            {#each section.points as point}<li>{point}</li>{/each}
+                                        </ul>
+                                    {/if}
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+
+                    <div class="row">
+                        <MaterialButton on:click={() => addDevotionals(3)} disabled={busy}>3 day devotional</MaterialButton>
+                        <MaterialButton on:click={() => addDevotionals(7)} disabled={busy}>7 day</MaterialButton>
+                        <MaterialButton on:click={() => addQuiz(5)} disabled={busy}>Quiz</MaterialButton>
+                    </div>
+
+                    {#if selected.devotionals?.length}
+                        {#each selected.devotionals as day}
+                            <div class="block">
+                                <strong>Day {day.day}: {day.title}</strong>
+                                {#if day.scripture}<em>{day.scripture}</em>{/if}
+                                <p>{day.body}</p>
+                            </div>
+                        {/each}
+                    {/if}
+
+                    {#if selected.quiz?.length}
+                        {#each selected.quiz as question, index}
+                            <div class="block">
+                                <strong>{index + 1}. {question.question}</strong>
+                                {#if question.options?.length}<p>{question.options.join(" / ")}</p>{/if}
+                                <p class="answer">Answer: {question.answer}</p>
+                            </div>
+                        {/each}
+                    {/if}
+                {:else}
+                    <p class="empty">Pick a note to read it, or start a new one from the transcript.</p>
+                {/if}
+            </div>
+        </div>
+    {:else}
+        <div class="row">
+            <input
+                class="search"
+                placeholder="G26, H430, agape, mercy..."
+                bind:value={query}
+                on:keydown={(e) => e.key === "Enter" && search()}
+            />
+            <MaterialButton icon="search" on:click={search}>Search</MaterialButton>
+        </div>
+
+        {#if studyStatus}<p class="status">{studyStatus}</p>{/if}
+
+        <div class="columns">
+            <div class="list">
+                {#each results as result (result.strongs)}
+                    <button class="item" class:selected={entry?.strongs === result.strongs} on:click={() => (entry = result)}>
+                        <span class="date">{result.strongs}</span>
+                        <span class="title">{result.translit || result.lemma}</span>
+                    </button>
+                {/each}
+            </div>
+
+            <div class="detail">
+                {#if entry}
+                    <h3>{entry.lemma} <span class="meta">{entry.strongs}</span></h3>
+                    <p class="meta">{entry.translit}{entry.pron ? ` · ${entry.pron}` : ""}</p>
+                    {#if entry.definition}<p class="summary">{entry.definition}</p>{/if}
+                    {#if entry.kjv}<p class="meta">KJV: {entry.kjv}</p>{/if}
+                    {#if entry.derivation}<p class="meta">{entry.derivation}</p>{/if}
+                    <div class="row">
+                        <MaterialButton on:click={() => copy(`${entry.lemma} (${entry.strongs}) ${entry.translit || ""}: ${entry.definition || ""}`)}>Copy</MaterialButton>
+                    </div>
+                {:else}
+                    <p class="empty">Search a Strong's number, a transliteration like agape, or an English word.</p>
+                {/if}
+            </div>
+        </div>
+    {/if}
+</div>
+
+<style>
+    .sermon {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        height: 100%;
+        overflow: hidden;
+        color: var(--text);
+    }
+
+    .switch {
+        display: flex;
+        gap: 4px;
+    }
+
+    .switch button {
+        flex: 1;
+        padding: 6px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text);
+        opacity: 0.6;
+        cursor: pointer;
+    }
+
+    .switch button.active {
+        opacity: 1;
+        background: var(--secondary, #333);
+        color: var(--secondary-text, #fff);
+    }
+
+    .row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .status {
+        margin: 0;
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+
+    .columns {
+        display: flex;
+        gap: 8px;
+        min-height: 0;
+        flex: 1;
+    }
+
+    .list {
+        width: 40%;
+        min-width: 140px;
+        overflow-y: auto;
+    }
+
+    .item {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        text-align: left;
+        padding: 6px;
+        border: none;
+        border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+    }
+
+    .item.selected {
+        background: var(--secondary, #333);
+        color: var(--secondary-text, #fff);
+    }
+
+    .date {
+        font-size: 0.75em;
+        opacity: 0.7;
+    }
+
+    .detail {
+        flex: 1;
+        overflow-y: auto;
+        min-width: 0;
+    }
+
+    h3 {
+        margin: 0 0 2px;
+        font-size: 1em;
+    }
+
+    .meta {
+        margin: 0 0 6px;
+        font-size: 0.8em;
+        opacity: 0.7;
+    }
+
+    .summary {
+        margin: 0 0 8px;
+        font-size: 0.9em;
+    }
+
+    .outline {
+        margin: 0 0 8px;
+        padding-left: 16px;
+        font-size: 0.9em;
+    }
+
+    .block {
+        margin: 8px 0;
+        font-size: 0.9em;
+    }
+
+    .block p {
+        margin: 2px 0;
+    }
+
+    .answer {
+        opacity: 0.7;
+    }
+
+    .empty {
+        font-size: 0.85em;
+        opacity: 0.6;
+    }
+
+    .search {
+        flex: 1;
+        padding: 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+        background: transparent;
+        color: var(--text);
+    }
+</style>

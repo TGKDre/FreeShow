@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildSongLibrary, lineText, lyricLinesFromShow } from "./songLibrary"
+import { buildSongLibrary, lineText, lyricLinesFromShow, slideIdForLine } from "./songLibrary"
 
 const slide = (lines: string[][]) => ({
     items: lines.map((parts) => ({ lines: [{ align: "", text: parts.map((value) => ({ value, style: "" })) }] }))
@@ -32,6 +32,20 @@ describe("show to lyric lines", () => {
 
     it("handles a show without slides", () => {
         expect(lyricLinesFromShow(undefined)).toEqual([])
+    })
+})
+
+describe("slide for a lyric line", () => {
+    it("matches the order the lines were collected in", () => {
+        expect(slideIdForLine(show as any, 0)).toBe("s1")
+        expect(slideIdForLine(show as any, 1)).toBe("s2")
+        expect(slideIdForLine(show as any, 2)).toBe("s2")
+    })
+
+    it("returns null past the end or for bad input", () => {
+        expect(slideIdForLine(show as any, 99)).toBeNull()
+        expect(slideIdForLine(show as any, -1)).toBeNull()
+        expect(slideIdForLine(undefined, 0)).toBeNull()
     })
 })
 

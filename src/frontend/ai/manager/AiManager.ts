@@ -5,13 +5,15 @@ import type { ConfidenceLevels } from "../../../types/ai/AiSettings"
 import { startScripture } from "../../components/actions/apiHelper"
 import { keysToID } from "../../components/helpers/array"
 import { getFirstActiveOutput } from "../../components/helpers/output"
-import { openShow } from "../../components/helpers/show"
+import { getLayoutRef, openShow } from "../../components/helpers/show"
+import { updateOut } from "../../components/helpers/showActions"
+import { loadShows } from "../../components/helpers/setShow"
 import { setActiveScripture } from "../../converters/bible"
-import { ai, aiSmartAction, aiSuggestions, drawerTabsData, outputs, scriptures } from "../../stores"
+import { ai, aiSmartAction, aiSuggestions, drawerTabsData, outputs, scriptures, showsCache } from "../../stores"
 import { newToast } from "../../utils/common"
 import { getLLMManager } from "../llm/llmManager"
 import { findLyricMatch } from "../lyrics/lyricDetector"
-import { getSongLibrary } from "../lyrics/songLibrary"
+import { getSongLibrary, slideIdForLine } from "../lyrics/songLibrary"
 import { BibleCacheManager } from "../scripture/BibleCacheManager"
 import { detectBibleVersion } from "../scripture/BibleVersionDetector"
 import { isReferenceWithin } from "../scripture/references"
@@ -60,6 +62,25 @@ export class AiManager {
     }
 
     private static lastLyricLine: { songId: string; lineIndex: number } | null = null
+    /** Open the song and go straight to the slide the line came from. */
+    private static async openSongAtLine(showId: string, lineIndex: number) {
+        openShow(showId)
+        if (lineIndex < 0) return
+
+        await loadShows([showId]).catch(() => null)
+        const show = get(showsCache)[showId]
+        if (!show?.slides) return
+
+        const slideId = slideIdForLine(show, lineIndex)
+        if (!slideId) return
+
+        const layoutRef = getLayoutRef(showId)
+        const index = layoutRef.findIndex((ref) => ref.id === slideId)
+        if (index < 0) return
+
+        updateOut(showId, index, layoutRef)
+    }
+
     private static lyricDetection(textChunk: string) {
         // scripture is checked first on purpose: worship lyrics are the fallback signal, not a competitor
         const songs = getSongLibrary()
@@ -244,7 +265,7 @@ export class AiManager {
             startScripture({ reference: match.content })
             this.outputUpdate(match.content)
         } else if (match.type === "lyrics") {
-            if (match.lyricsSongId) openShow(match.lyricsSongId)
+            if (match.lyricsSongId) this.openSongAtLine(match.lyricsSongId, match.lyricsLineIndex ?? -1)
             this.outputUpdate(match.content)
         }
     }

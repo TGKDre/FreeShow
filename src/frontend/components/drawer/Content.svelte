@@ -14,6 +14,7 @@
     import Shows from "./pages/Shows.svelte"
     import Templates from "./pages/Templates.svelte"
     import Variables from "./pages/Variables.svelte"
+    import Sermon from "./sermon/Sermon.svelte"
     import Timers from "./timers/Timers.svelte"
 
     export let id: string
@@ -65,6 +66,8 @@
         <Scripture {active} bind:searchValue />
     {:else if id === "calendar"}
         <Calendar {active} {searchValue} />
+    {:else if id === "sermon"}
+        <Sermon {active} />
     {:else if id === "functions"}
         {#if active === "actions"}
             <Actions {searchValue} />

@@ -11,6 +11,7 @@ export const drawerTabs = {
 
     scripture: { name: "tabs.scripture", icon: "scripture", title: "" },
     calendar: { name: "tabs.calendar", icon: "calendar", title: "" },
+    sermon: { name: "Sermon", icon: "book", title: "Sermon notes and word study" },
 
     functions: { name: "tabs.functions", icon: "functions", title: "" }
 }
