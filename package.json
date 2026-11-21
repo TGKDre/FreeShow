@@ -17,6 +17,8 @@
     },
     "scripts": {
         "postinstall": "electron-builder install-app-deps",
+        "data:lyrics": "python3 scripts/data/loveworld-lyrics.py",
+        "data:bibles": "node scripts/data/bibleshow-to-freeshow.mjs bibles-raw assets/data/bibles",
         "rebuild-opus": "electron-rebuild -f -o @discordjs/opus && node scripts/opus.js",
         "---DEVELOPMENT---": "",
         "start": "node scripts/start.js",

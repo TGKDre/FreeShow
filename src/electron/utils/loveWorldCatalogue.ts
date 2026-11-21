@@ -98,8 +98,11 @@ export class LoveWorldCatalogue {
 
     /** Full lyrics for one song, as slide text with a blank line between sections. */
     static async getLyrics(song: { slug: string; title: string; meta?: string }): Promise<string> {
+        // a song whose lyrics were not published when the pack was built falls through to the site,
+        // which may have written them since
         const available = loadBundled()?.lyrics.get(song.slug)
-        if (available) return songToShowText(available)
+        const bundledText = available ? songToShowText(available) : ""
+        if (bundledText) return bundledText
 
         try {
             const html = await fetchHtml(`${SITE}/song/${encodeURIComponent(song.slug)}`)

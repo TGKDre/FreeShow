@@ -56,7 +56,14 @@ def parse_index(html: str):
     return songs
 
 
+PLACEHOLDER = "lyrics being written out"
+
+
 def parse_song(html: str):
+    # a page that is still waiting for its lyrics says so; anything scraped from it is page furniture
+    if PLACEHOLDER in html.lower():
+        return []
+
     text = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", html, flags=re.I)
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
     text = re.sub(r"</(p|div|h[1-6]|li|span)>", "\n", text, flags=re.I)
@@ -113,6 +120,11 @@ def stanzas_from_html(html, text, noise):
 
     if len(stanzas) < 2:
         return []
+
+    # one block holding the whole song still needs bunching, or it lands on screen as one wall
+    if len(stanzas) == 1:
+        flat_lines = stanzas[0]
+        return [{"label": "Lyrics", "lines": flat_lines[i:i + 4]} for i in range(0, len(flat_lines), 4)]
 
     # some pages put one line per paragraph, which leaves nothing to bunch: rebuild in fours
     if sorted(len(stanza) for stanza in stanzas)[len(stanzas) // 2] <= 1:
