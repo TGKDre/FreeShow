@@ -3,6 +3,7 @@
     import type { SermonNote } from "../../../../types/ai/Sermon"
     import { Main } from "../../../../types/IPC/Main"
     import { assembleNote, buildDevotionalPrompt, buildNotesPrompt, buildQuizPrompt, parseModelJson } from "../../../../types/ai/sermonFormat"
+    import { convertText } from "../../../converters/txt"
     import { getLLMManager } from "../../../ai/llm/llmManager"
     import { lookupAnywhere } from "../../../ai/lexicon/Lexicon"
     import { requestMain } from "../../../IPC/main"
@@ -11,7 +12,7 @@
 
     export let active: string | null
 
-    let mode: "notes" | "study" = active === "study" ? "study" : "notes"
+    let mode: "notes" | "study" | "announce" = active === "study" ? "study" : "notes"
     let status = ""
     let busy = false
 
@@ -132,6 +133,18 @@
         }
     }
 
+    // --- announcements ---
+    let announcement = ""
+
+    function sendAnnouncement() {
+        const text = announcement.trim()
+        if (!text) return
+        // convertText opens the created show, and a slide with no bindings goes to every active output
+        convertText({ name: "Announcement", category: null, text })
+        announcement = ""
+        status = "Sent."
+    }
+
     // --- word study ---
     let query = ""
     let results: LexiconEntry[] = []
@@ -165,9 +178,17 @@
     <div class="switch">
         <button class:active={mode === "notes"} on:click={() => (mode = "notes")}>Sermon notes</button>
         <button class:active={mode === "study"} on:click={() => (mode = "study")}>Word study</button>
+        <button class:active={mode === "announce"} on:click={() => (mode = "announce")}>Announce</button>
     </div>
 
-    {#if mode === "notes"}
+    {#if mode === "announce"}
+        <p class="empty">Plain text becomes a slide and goes out on every output that has no fixed binding, the same path quick text uses.</p>
+        <textarea class="search" rows="6" bind:value={announcement} placeholder="This Sunday: prayer at 9:30, service at 10."></textarea>
+        <div class="row">
+            <MaterialButton icon="play_arrow" on:click={sendAnnouncement}>Show on all screens</MaterialButton>
+        </div>
+        {#if status}<p class="status">{status}</p>{/if}
+    {:else if mode === "notes"}
         <div class="row">
             <MaterialButton icon="add" on:click={generateNote} disabled={busy}>Note from transcript</MaterialButton>
             <MaterialButton icon="refresh" on:click={refreshNotes} disabled={busy}>Refresh</MaterialButton>
