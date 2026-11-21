@@ -40,18 +40,106 @@ export function colorToCss(color?: PPColor | null): string {
     return `rgba(${channel(color.red)},${channel(color.green)},${channel(color.blue)},${Math.round(alpha * 100) / 100})`
 }
 
+/**
+ * Families the Grace City themes use that are licensed and therefore not installed on the church PC, mapped
+ * to the closest free face that IS installed there. Without this a missing face drops to the browser default
+ * and a serif lands in the middle of a lyric slide.
+ */
+const FALLBACKS: Record<string, string[]> = {
+    gotham: ["Montserrat"],
+    "brandon grotesque": ["Montserrat"],
+    "neue kabel": ["Montserrat"],
+    "new kansas": ["Montserrat"],
+    "ivypresto display": ["Montserrat"],
+    lust: ["Montserrat"],
+    "lust text": ["Montserrat"],
+    "lust script": ["Montserrat"],
+    botanist: ["Montserrat"],
+    "century gothic": ["Montserrat"],
+    "aktiv grotesk": ["Inter"],
+    effra: ["Inter"],
+    "acumin pro": ["Inter"],
+    termina: ["Inter"],
+    tenez: ["Inter"],
+    obviously: ["Inter"],
+    "lo res 9 plus ot": ["Inter"],
+    "lores 9 plus ot": ["Inter"],
+    nautica: ["Inter"],
+    macula: ["Inter"],
+    degular: ["Inter"],
+    distancia: ["Inter"],
+    helvetica: ["Nimbus Sans", "Inter"],
+    "helvetica neue": ["Nimbus Sans", "Inter"],
+    "neue haas grotesk": ["Nimbus Sans", "Inter"],
+    "neue haas grotesk display pro": ["Nimbus Sans", "Inter"],
+    "quiche flare": ["Bebas Neue"],
+    quicheflare: ["Bebas Neue"],
+    "dharma gothic e": ["Bebas Neue"],
+    gangitem: ["Bebas Neue"],
+    "hyperwave two": ["Bebas Neue"]
+}
+
+const WEIGHTS: Record<string, string> = {
+    thin: "100",
+    ultralight: "200",
+    extralight: "200",
+    light: "300",
+    regular: "400",
+    book: "400",
+    normal: "400",
+    medium: "500",
+    semibold: "600",
+    demibold: "600",
+    extrabold: "800",
+    bold: "700",
+    black: "900",
+    heavy: "900"
+}
+
+/** "CMGSans-BoldCAPS", "ArialMT", "HelveticaNeue-Light" -> family, weight, italic, caps. */
+export function normalizeFontName(raw: string) {
+    let name = (raw || "").trim().replace(/MT$/, "").replace(/PSMT$/, "")
+    const caps = /CAPS$/.test(name)
+    if (caps) name = name.replace(/CAPS$/, "")
+
+    let weight = ""
+    let italic = /Italic/i.test(name)
+    const parts = name.split("-")
+    if (parts.length > 1) {
+        const suffix = parts[parts.length - 1]
+        const key = suffix.replace(/Italic/gi, "").toLowerCase()
+        if (WEIGHTS[key]) weight = WEIGHTS[key]
+        if (/^(Regular|Bold|Light|Medium|Black|Thin|Book|Heavy|SemiBold|ExtraBold|UltraLight|ExtraLight|DemiBold|Normal)$/i.test(key)) name = parts.slice(0, -1).join("-")
+    }
+    // no hyphen form: "HelveticaNeue Light" style suffixes stay in the family, so only strip known tails
+    name = name.replace(/^CMGSans/i, "CMG Sans")
+    if (/^CMG\s*Sans\s*MonoDigits$/i.test(name)) name = "CMG Sans MonoDigits"
+    return { family: name.replace(/([a-z])([A-Z])/g, "$1 $2").split(/\s+/).filter(Boolean).join(" "), weight, italic, caps }
+}
+
 /** ProPresenter stores a font family and a point size; FreeShow text styles are CSS declarations. */
 export function fontToCss(element: PPThemeElement): string {
     const font = element.text?.font
-    const family = font?.family || font?.name || ""
+    const raw = font?.family || font?.name || ""
+    const { family, weight, italic, caps } = normalizeFontName(raw)
+
     const parts: string[] = []
-    if (family) parts.push(`font-family:${family}`)
+    if (family) {
+        const chain = [family, ...(FALLBACKS[family.toLowerCase()] || []), "Arial"]
+        const unique = chain.filter((name, index) => chain.indexOf(name) === index)
+        parts.push(`font-family:${unique.map((name) => (name.includes(" ") ? `"${name}"` : name)).join(", ")}`)
+    }
+
     const size = font?.size && font.size > 0 ? font.size : FALLBACK_SIZE
     parts.push(`font-size:${Math.round(size)}px`)
     const color = colorToCss(element.text?.color)
     if (color) parts.push(`color:${color}`)
-    if (font?.bold) parts.push("font-weight:bold")
-    if (font?.italic) parts.push("font-style:italic")
+
+    const cssWeight = font?.bold ? "700" : weight
+    if (cssWeight) parts.push(`font-weight:${cssWeight}`)
+    if (font?.italic || italic) parts.push("font-style:italic")
+    if (caps) parts.push("text-transform:uppercase")
+
     return `${parts.join(";")};`
 }
 

@@ -16,10 +16,14 @@ vi.mock("./ffmpegManager", () => ({ resolveFfmpegPath: async () => "ffmpeg" }))
 const { RtmpStreamer, setRtmpStatusListener, setRtmpNoticeListener, setRtmpResolvers } = await import("./RtmpStreamer")
 setRtmpResolvers({ resolveFfmpegPath: async () => "ffmpeg", resolveEncoder: async (enc): Promise<EncoderId> => (enc as EncoderId) || mocked.encoder })
 
+// The encoders pass -fps_mode, which ffmpeg only gained in 5.1. An older local build fails every encode
+// with "Option not found", so gate on the version instead of on presence alone.
 function hasFfmpeg(): boolean {
     try {
-        execFileSync("ffmpeg", ["-version"], { stdio: "ignore" })
-        return true
+        const out = execFileSync("ffmpeg", ["-version"], { encoding: "utf8" })
+        const match = out.match(/ffmpeg version (\d+)\.(\d+)/)
+        if (!match) return false
+        return Number(match[1]) * 100 + Number(match[2]) >= 501
     } catch {
         return false
     }
