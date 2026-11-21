@@ -9,6 +9,7 @@ import type { MainResponses } from "../../types/IPC/Main"
 import { Main } from "../../types/IPC/Main"
 import { ToMain } from "../../types/IPC/ToMain"
 import type { ErrorLog, LyricSearchResult, OS, SyncedLyricsQuery } from "../../types/Main"
+import type { SermonNote } from "../../types/ai/Sermon"
 import { completeLLM, fetchProviderModels } from "../ai/llm/llmProviders"
 import { setAiKey } from "../ai/setup/aiKeys"
 import { aiHandleLocalSetup, LocalModelManager } from "../ai/setup/LocalModelManager"
@@ -41,6 +42,7 @@ import { listGraphicsDevices } from "../utils/gpu"
 import { getMachineId } from "../utils/helpers"
 import { LyricSearch } from "../utils/LyricSearch"
 import { fetchSyncedLyrics } from "../utils/lrclib"
+import { listNotes, loadNote, saveNote } from "../data/sermonNotes"
 import { closeMidiInPorts, getMidiInputs, getMidiOutputs, receiveMidi, sendMidi } from "../utils/midi"
 import { getHidDevices, hidAwaitInput, hidClose } from "../utils/hid"
 import { deleteShows, deleteShowsNotIndexed, getAllShows, getEmptyShows, refreshAllShows } from "../utils/shows"
@@ -172,6 +174,9 @@ export const mainResponses: MainResponses = {
     [Main.GET_LYRICS]: (data) => getLyrics(data),
     [Main.SEARCH_LYRICS]: (data) => searchLyrics(data),
     [Main.GET_SYNCED_LYRICS]: (data) => getSyncedLyrics(data),
+    [Main.SAVE_SERMON_NOTE]: (data) => ({ path: saveSermonNote(data) }),
+    [Main.LIST_SERMON_NOTES]: () => listSermonNotes(),
+    [Main.LOAD_SERMON_NOTE]: (data) => loadSermonNote(data.id),
     // FILES
     [Main.RESTORE]: (data) => restoreFiles(data),
     [Main.RECORDER]: (data) => saveRecording(data),
@@ -425,6 +430,23 @@ async function getLyrics({ song }: { song: LyricSearchResult }) {
 // timestamped lyrics from LRCLIB, for highlighting the current line while a track plays
 async function getSyncedLyrics(query: SyncedLyricsQuery) {
     return await fetchSyncedLyrics(query)
+}
+
+// the sermon archive is plain markdown in the data folder, so it survives updates and stays readable
+function sermonNotesFolder() {
+    return getDataFolderPath("sermonNotes")
+}
+
+function saveSermonNote(note: SermonNote) {
+    return saveNote(sermonNotesFolder(), note)
+}
+
+function listSermonNotes() {
+    return listNotes(sermonNotesFolder()).map(({ id, title, date }) => ({ id, title, date }))
+}
+
+function loadSermonNote(id: string) {
+    return loadNote(sermonNotesFolder(), id)
 }
 
 // GET DEVICE MEDIA PERMISSION

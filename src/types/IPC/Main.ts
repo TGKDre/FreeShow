@@ -11,6 +11,7 @@ import type { TimecodeMode } from "../../electron/timecode/timecode"
 import type { AIProviderId, AiSetupOptions, EngineStatus } from "../ai/Ai"
 import type { SttEngineOptions } from "../ai/AiSettings"
 import type { ErrorLog, FileFolder, LessonsData, LyricSearchResult, MainFilePaths, Media, MediaCodecInfo, OS, SpotifyState, Subtitle, SyncedLyricsQuery, SyncedLyricsResult } from "../Main"
+import type { SermonNote } from "../ai/Sermon"
 import type { Output } from "../Output"
 import type { Folders, Projects } from "../Projects"
 import type { Dictionary, Resolution, Themes } from "../Settings"
@@ -132,6 +133,9 @@ export enum Main {
     GET_LYRICS = "GET_LYRICS",
     SEARCH_LYRICS = "SEARCH_LYRICS",
     GET_SYNCED_LYRICS = "GET_SYNCED_LYRICS",
+    SAVE_SERMON_NOTE = "SAVE_SERMON_NOTE",
+    LIST_SERMON_NOTES = "LIST_SERMON_NOTES",
+    LOAD_SERMON_NOTE = "LOAD_SERMON_NOTE",
     RECORDER = "RECORDER",
     RESTORE = "RESTORE",
     SYSTEM_OPEN = "SYSTEM_OPEN",
@@ -257,6 +261,9 @@ export interface MainSendPayloads {
     [Main.GET_LYRICS]: { song: LyricSearchResult }
     [Main.SEARCH_LYRICS]: { artist: string; title: string }
     [Main.GET_SYNCED_LYRICS]: SyncedLyricsQuery
+    [Main.SAVE_SERMON_NOTE]: SermonNote
+    [Main.LIST_SERMON_NOTES]: undefined
+    [Main.LOAD_SERMON_NOTE]: { id: string }
     [Main.RESTORE]?: { path: string }
     [Main.RECORDER]: { blob: ArrayBuffer; name: string; path?: string }
     [Main.SYSTEM_OPEN]: string
@@ -384,6 +391,9 @@ export interface MainReturnPayloads {
     [Main.GET_LYRICS]: Promise<{ lyrics: string; source: string; title: string; artist: string }>
     [Main.SEARCH_LYRICS]: Promise<LyricSearchResult[]>
     [Main.GET_SYNCED_LYRICS]: Promise<SyncedLyricsResult | null>
+    [Main.SAVE_SERMON_NOTE]: { path: string }
+    [Main.LIST_SERMON_NOTES]: { id: string; title: string; date: string }[]
+    [Main.LOAD_SERMON_NOTE]: SermonNote | null
     [Main.GET_SIMILAR]: { path: string; name: string }[]
     [Main.RESTORE_CLOUD_BACKUP]: Promise<{ success: boolean; error?: string }>
     [Main.MEDIA_FOLDER_COPY]: Promise<boolean>

@@ -364,6 +364,7 @@ export const dataFolderNames = {
     lessons: "Lessons",
     planningcenter: "Planning Center",
     recordings: "Recordings",
+    sermonNotes: "Sermon Notes",
     audio: "Audio",
     userData: "Config",
     cloud: "Cloud"
