@@ -250,7 +250,7 @@ export interface MainFilePaths {
 }
 
 export type LyricSearchResult = {
-    source: "Genius" | "Hymnary" | "Letras" | "Ultimate Guitar"
+    source: "Genius" | "Hymnary" | "Letras" | "Ultimate Guitar" | "LoveWorld"
     key: string
     artist: string
     title: string

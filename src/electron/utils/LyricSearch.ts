@@ -1,6 +1,7 @@
 import axios from "axios"
 import { net } from "electron"
 import type { LyricSearchResult } from "../../types/Main"
+import { LoveWorldCatalogue } from "./loveWorldCatalogue"
 
 const lyricsSearchCache: Map<string, LyricSearchResult[]> = new Map()
 export class LyricSearch {
@@ -8,7 +9,8 @@ export class LyricSearch {
         const cacheKey = artist + title
         if (lyricsSearchCache.has(cacheKey)) return lyricsSearchCache.get(cacheKey)!
 
-        const results = await Promise.all([LyricSearch.searchGenius(artist, title), LyricSearch.searchUltimateGuitar(artist, title), LyricSearch.searchLetras(title), LyricSearch.searchHymnary(title)])
+        // LoveWorld first: this church sings from that catalogue, and no general service carries it
+        const results = await Promise.all([LyricSearch.searchLoveWorld(title), LyricSearch.searchGenius(artist, title), LyricSearch.searchUltimateGuitar(artist, title), LyricSearch.searchLetras(title), LyricSearch.searchHymnary(title)])
         const joinedResults: LyricSearchResult[] = results.flat()
 
         lyricsSearchCache.set(cacheKey, joinedResults)
@@ -20,7 +22,30 @@ export class LyricSearch {
         else if (song.source === "Hymnary") return LyricSearch.getHymnary(song)
         else if (song.source === "Letras") return LyricSearch.getLetras(song)
         else if (song.source === "Ultimate Guitar") return LyricSearch.getUltimateGuitar(song)
+        else if (song.source === "LoveWorld") return LyricSearch.getLoveWorld(song)
         return Promise.resolve("")
+    }
+
+    // LOVEWORLD
+
+    private static searchLoveWorld = async (title: string): Promise<LyricSearchResult[]> => {
+        try {
+            const songs = await LoveWorldCatalogue.search(title)
+            return songs.map((song) => ({
+                source: "LoveWorld" as const,
+                key: song.slug,
+                artist: song.meta.toLowerCase().startsWith("led by") ? song.meta.replace(/^led by\s*/i, "").split("·")[0].trim() : "",
+                title: song.title,
+                originalQuery: title
+            }))
+        } catch (err) {
+            console.error(err)
+            return []
+        }
+    }
+
+    private static getLoveWorld = async (song: LyricSearchResult) => {
+        return await LoveWorldCatalogue.getLyrics({ slug: song.key, title: song.title, meta: song.artist })
     }
 
     // GENIUS
