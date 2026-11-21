@@ -10,7 +10,7 @@ import type { EncoderDetection } from "../../electron/streaming/encoderDetection
 import type { TimecodeMode } from "../../electron/timecode/timecode"
 import type { AIProviderId, AiSetupOptions, EngineStatus } from "../ai/Ai"
 import type { SttEngineOptions } from "../ai/AiSettings"
-import type { ErrorLog, FileFolder, LessonsData, LyricSearchResult, MainFilePaths, Media, MediaCodecInfo, OS, SpotifyState, Subtitle } from "../Main"
+import type { ErrorLog, FileFolder, LessonsData, LyricSearchResult, MainFilePaths, Media, MediaCodecInfo, OS, SpotifyState, Subtitle, SyncedLyricsQuery, SyncedLyricsResult } from "../Main"
 import type { Output } from "../Output"
 import type { Folders, Projects } from "../Projects"
 import type { Dictionary, Resolution, Themes } from "../Settings"
@@ -131,6 +131,7 @@ export enum Main {
     CLOSE_HID = "CLOSE_HID",
     GET_LYRICS = "GET_LYRICS",
     SEARCH_LYRICS = "SEARCH_LYRICS",
+    GET_SYNCED_LYRICS = "GET_SYNCED_LYRICS",
     RECORDER = "RECORDER",
     RESTORE = "RESTORE",
     SYSTEM_OPEN = "SYSTEM_OPEN",
@@ -255,6 +256,7 @@ export interface MainSendPayloads {
     [Main.CLOSE_HID]: { path: string }
     [Main.GET_LYRICS]: { song: LyricSearchResult }
     [Main.SEARCH_LYRICS]: { artist: string; title: string }
+    [Main.GET_SYNCED_LYRICS]: SyncedLyricsQuery
     [Main.RESTORE]?: { path: string }
     [Main.RECORDER]: { blob: ArrayBuffer; name: string; path?: string }
     [Main.SYSTEM_OPEN]: string
@@ -381,6 +383,7 @@ export interface MainReturnPayloads {
     [Main.GET_HID_DEVICES]: Promise<any[]>
     [Main.GET_LYRICS]: Promise<{ lyrics: string; source: string; title: string; artist: string }>
     [Main.SEARCH_LYRICS]: Promise<LyricSearchResult[]>
+    [Main.GET_SYNCED_LYRICS]: Promise<SyncedLyricsResult | null>
     [Main.GET_SIMILAR]: { path: string; name: string }[]
     [Main.RESTORE_CLOUD_BACKUP]: Promise<{ success: boolean; error?: string }>
     [Main.MEDIA_FOLDER_COPY]: Promise<boolean>

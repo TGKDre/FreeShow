@@ -8,7 +8,7 @@ import { getMainWindow, isProd, mainWindow, maximizeMain, setGlobalMenu } from "
 import type { MainResponses } from "../../types/IPC/Main"
 import { Main } from "../../types/IPC/Main"
 import { ToMain } from "../../types/IPC/ToMain"
-import type { ErrorLog, LyricSearchResult, OS } from "../../types/Main"
+import type { ErrorLog, LyricSearchResult, OS, SyncedLyricsQuery } from "../../types/Main"
 import { completeLLM, fetchProviderModels } from "../ai/llm/llmProviders"
 import { setAiKey } from "../ai/setup/aiKeys"
 import { aiHandleLocalSetup, LocalModelManager } from "../ai/setup/LocalModelManager"
@@ -40,6 +40,7 @@ import { addToMediaFolder, bundleMediaFiles, createFolder, getDataFolderPath, ge
 import { listGraphicsDevices } from "../utils/gpu"
 import { getMachineId } from "../utils/helpers"
 import { LyricSearch } from "../utils/LyricSearch"
+import { fetchSyncedLyrics } from "../utils/lrclib"
 import { closeMidiInPorts, getMidiInputs, getMidiOutputs, receiveMidi, sendMidi } from "../utils/midi"
 import { getHidDevices, hidAwaitInput, hidClose } from "../utils/hid"
 import { deleteShows, deleteShowsNotIndexed, getAllShows, getEmptyShows, refreshAllShows } from "../utils/shows"
@@ -170,6 +171,7 @@ export const mainResponses: MainResponses = {
     // LYRICS
     [Main.GET_LYRICS]: (data) => getLyrics(data),
     [Main.SEARCH_LYRICS]: (data) => searchLyrics(data),
+    [Main.GET_SYNCED_LYRICS]: (data) => getSyncedLyrics(data),
     // FILES
     [Main.RESTORE]: (data) => restoreFiles(data),
     [Main.RECORDER]: (data) => saveRecording(data),
@@ -418,6 +420,11 @@ async function searchLyrics({ artist, title }: { artist: string; title: string }
 async function getLyrics({ song }: { song: LyricSearchResult }) {
     const lyrics = await LyricSearch.get(song)
     return { lyrics, source: song.source, title: song.title, artist: song.artist }
+}
+
+// timestamped lyrics from LRCLIB, for highlighting the current line while a track plays
+async function getSyncedLyrics(query: SyncedLyricsQuery) {
+    return await fetchSyncedLyrics(query)
 }
 
 // GET DEVICE MEDIA PERMISSION

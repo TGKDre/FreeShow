@@ -257,6 +257,30 @@ export type LyricSearchResult = {
     originalQuery?: string
 }
 
+/** One timestamped line from an LRC sheet. */
+export interface SyncedLyricLine {
+    timeMs: number
+    text: string
+}
+
+/** Timestamped lyrics for a track, from LRCLIB. */
+export interface SyncedLyricsResult {
+    title: string
+    artist: string
+    album?: string
+    durationMs?: number
+    instrumental: boolean
+    lines: SyncedLyricLine[]
+    hasTimestamps: boolean
+}
+
+export interface SyncedLyricsQuery {
+    title: string
+    artist: string
+    album?: string
+    durationMs?: number
+}
+
 export interface DriveData {
     mainFolderId: string | null
     method: string | null
