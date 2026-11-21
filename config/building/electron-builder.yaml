@@ -25,6 +25,11 @@ files:
     - "!**/node_modules/osr-capture/**/on12_harness.exe"
 
 extraResources:
+    # data packs: LoveWorld lyrics and the BibleShow translations, built by scripts/data/*
+    - from: assets/data/
+      to: data
+      filter:
+          - "**/*"
     - from: node_modules/slideshow/
       to: slideshow
       filter:

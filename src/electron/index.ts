@@ -10,6 +10,7 @@ import type { Dictionary } from "../types/Settings"
 import { receiveAudio } from "./audio/receiveAudio"
 import { receiveBM } from "./blackmagic/bmdTalk"
 import { cloudConnect } from "./cloud/cloud"
+import { preloadBundledBibles } from "./data/preloadBibles"
 import { startExport } from "./data/export"
 import { cleanupProtectedCache, registerProtectedProtocol } from "./data/protected"
 import { config, setupStores } from "./data/store"
@@ -120,6 +121,7 @@ app.on("ready", async () => {
     setTimeout(() => logGpuStatus("t=25s"), 25_000)
     // compares the steady-state GPU regime against the user's intent, notifies on degradation
     scheduleGpuHealthCheck()
+    preloadBundledBibles()
     await startApp()
     requestHeaders()
 })
