@@ -10,6 +10,7 @@
     import LlmFiles from "./LlmFiles.svelte"
     import LlmOptions from "./LlmOptions.svelte"
     import NemotronOptions from "./NemotronOptions.svelte"
+    import WhisperOptions from "./WhisperOptions.svelte"
 
     const mode = $popupData.mode
     popupData.set({})
@@ -32,8 +33,8 @@
     }
 
     const sttEngines = [
-        { value: "nemotron", label: "Nemotron", data: "Transcribes as you speak, so references are picked up almost immediately. Supports around 40 languages." }
-        // other models in the future?
+        { value: "nemotron", label: "Nemotron (live)", data: "Transcribes as you speak, so references are picked up almost immediately. Supports around 40 languages." },
+        { value: "whisper", label: "Whisper large v3 turbo", data: "Waits for a pause, then transcribes the whole sentence. Slower to the first word, sharper on long preaching and on names." }
     ]
     $: selectedSttEngine = sttOptions.engine || resolveSttEngine()
 
@@ -63,6 +64,8 @@
 
     {#if selectedSttEngine === "nemotron"}
         <NemotronOptions />
+    {:else if selectedSttEngine === "whisper"}
+        <WhisperOptions />
     {/if}
 {/if}
 

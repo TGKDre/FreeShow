@@ -13,6 +13,7 @@ export async function aiGetModelStatus(data?: { engineId?: string; modelId?: str
     const { engineId: id, modelId = "", customPath } = data || {}
 
     if (!id || id === "nemotron") status.nemotron = await LocalModelManager.getStatus("nemotron", modelId, customPath)
+    if (!id || id === "whisper") status.whisper = await LocalModelManager.getStatus("whisper", modelId, customPath)
 
     if (!id || id === "ollama") {
         status.ollama = await checkConnectionStatus("ollama", "", modelId)

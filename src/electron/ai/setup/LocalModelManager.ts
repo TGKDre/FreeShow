@@ -24,6 +24,7 @@ export class LocalModelManager {
     private static getManager(engineId: string) {
         // require lazily to avoid circular imports when models import these helpers
         if (engineId === "nemotron") return require("./models/nemotron").NemotronSetupManager
+        if (engineId === "whisper") return require("./models/whisper").WhisperSetupManager
         return null
     }
 
@@ -55,9 +56,9 @@ export class LocalModelManager {
             return { ready: await manager.verifyModel?.(modelPath), localPath: modelPath }
         }
 
-        if (engineId === "nemotron") {
+        if (engineId === "nemotron" || engineId === "whisper") {
             if (manager.isPlatformSupported && !manager.isPlatformSupported()) {
-                return { ready: false, unsupported: true, error: "Nemotron transcription is not supported on Intel Mac" }
+                return { ready: false, unsupported: true, error: `${engineId === "whisper" ? "Whisper" : "Nemotron"} transcription is not supported on this platform` }
             }
             const modelDir = this.getModelDir(engineId)
             const integrity = await manager.checkIntegrity(modelDir)
@@ -79,7 +80,7 @@ export class LocalModelManager {
         if (!manager) return false
         if (manager.isPlatformSupported && !manager.isPlatformSupported()) return false
 
-        const outputFolder = engineId === "nemotron" ? this.getModelDir(engineId) : this.getEngineDir(engineId)
+        const outputFolder = engineId === "nemotron" || engineId === "whisper" ? this.getModelDir(engineId) : this.getEngineDir(engineId)
         createFolder(outputFolder)
 
         const result = await manager.downloadEngine(outputFolder)
@@ -110,7 +111,7 @@ export class LocalModelManager {
     static deleteModel = (engineId: string, modelId: string) => this.removePath(this.getModelPath(engineId, modelId))
     static deleteEngine = (engineId: string) => this.removePath(this.getEngineDir(engineId), true)
 
-    private static ENGINES = ["nemotron"]
+    private static ENGINES = ["nemotron", "whisper"]
     static async getDownloadedBinFiles() {
         const files = this.ENGINES.map((engineFolder) => {
             const filePath = path.join(BIN_DIR, engineFolder)

@@ -3,9 +3,10 @@ import { ToMain } from "../../../types/IPC/ToMain"
 import { sendToMain } from "../../IPC/main"
 import { LocalModelManager } from "../setup/LocalModelManager"
 import { NemotronTranscriber } from "./models/NemotronTranscriber"
+import { WhisperTranscriber } from "./models/WhisperTranscriber"
 import type { TranscriberSegment } from "./sttHelper"
 
-type SttEngine = NemotronTranscriber
+type SttEngine = NemotronTranscriber | WhisperTranscriber
 type SegmentListener = (segment: TranscriberSegment) => void
 
 const sanitizeError = (msg: string) => msg.replace(/\s+/g, " ").trim().slice(0, 200)
@@ -72,6 +73,12 @@ export class SpeechToText {
             const status = await LocalModelManager.getStatus("nemotron")
             if (!status.ready) return { error: status.error || "Nemotron could not be initialized" }
             return { transcriber: new NemotronTranscriber({ ...options }, this.onSegment, this.onError, this.onInterim) }
+        }
+
+        if (engine === "whisper") {
+            const status = await LocalModelManager.getStatus("whisper")
+            if (!status.ready) return { error: status.error || "Whisper could not be initialized" }
+            return { transcriber: new WhisperTranscriber({ ...options }, this.onSegment, this.onError) }
         }
 
         console.error(`Unknown STT engine: ${engine}`)

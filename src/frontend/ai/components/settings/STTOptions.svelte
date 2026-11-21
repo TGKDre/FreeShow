@@ -3,10 +3,13 @@
     import type { EngineStatus } from "../../../../types/ai/Ai"
     import { requestMain } from "../../../IPC/main"
     import { AudioMicrophone } from "../../../audio/audioMicrophone"
+    import T from "../../../components/helpers/T.svelte"
+    import InputRow from "../../../components/input/InputRow.svelte"
     import Title from "../../../components/input/Title.svelte"
+    import MaterialButton from "../../../components/inputs/MaterialButton.svelte"
     import MaterialDropdown from "../../../components/inputs/MaterialDropdown.svelte"
     import Tip from "../../../components/main/Tip.svelte"
-    import { ai, mediaDownloads } from "../../../stores"
+    import { activePopup, ai, mediaDownloads, popupData } from "../../../stores"
     import { resolveSttEngine, SpeechToText } from "../../stt/stt"
 
     $: options = $ai.stt || {}
@@ -54,16 +57,16 @@
         })
     }
 
-    // const sttEngines = {
-    //     nemotron: { label: "Nemotron" }
-    // }
+    const sttEngines: { [key: string]: { label: string } } = {
+        nemotron: { label: "Nemotron (live)" },
+        whisper: { label: "Whisper large v3 turbo" }
+    }
     $: selectedEngine = $ai.stt?.engine || resolveSttEngine()
 </script>
 
 <Title label="ai.transcription" icon="microphone" />
 
-<!-- Currently not needed as there's just one engine -->
-<!-- <InputRow>
+<InputRow>
     <MaterialButton
         title="titlebar.edit"
         icon="edit"
@@ -73,9 +76,9 @@
             activePopup.set("ai_model_manager")
         }}
     >
-        <T id="ai.engine" />: <span style="font-weight: bold;">{sttEngines[selectedEngine]?.label}</span>
+        <T id="ai.engine" />: <span style="font-weight: bold;">{sttEngines[selectedEngine]?.label || selectedEngine}</span>
     </MaterialButton>
-</InputRow> -->
+</InputRow>
 
 {#if status?.ready}
     <MaterialDropdown label="midi.input" options={microphones} value={options.micDeviceId || ""} on:change={(e) => updateValue("micDeviceId", e.detail)} />
