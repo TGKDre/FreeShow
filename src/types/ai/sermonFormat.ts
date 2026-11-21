@@ -159,6 +159,55 @@ export function parseNote(text: string, fallbackFileName = ""): SermonNote {
     }
 }
 
+/**
+ * Split a long service into parts that fit a modest context window without cutting a sentence.
+ * Overlap keeps a thought that straddles a boundary from being lost between two summaries.
+ */
+export function chunkTranscript(transcript: string, targetWords = 1200, overlapWords = 60): string[] {
+    const text = (transcript || "").trim()
+    if (!text) return []
+
+    const words = text.split(/\s+/)
+    if (words.length <= targetWords) return [text]
+
+    const chunks: string[] = []
+    let start = 0
+    while (start < words.length) {
+        const end = Math.min(words.length, start + targetWords)
+        chunks.push(words.slice(start, end).join(" "))
+        if (end >= words.length) break
+        start = Math.max(start + 1, end - overlapWords)
+    }
+    return chunks
+}
+
+export function buildChunkSummaryPrompt(chunk: string, index: number, total: number): string {
+    return [
+        `This is part ${index} of ${total} of one church service.`,
+        "Summarise only this part. Keep the preacher's own framing, the scriptures named, and any illustration or turn of phrase worth keeping.",
+        "Return plain prose, no headings, no JSON, at most 150 words.",
+        "Transcript:",
+        chunk
+    ].join("\n")
+}
+
+export function buildMergePrompt(summaries: string[], title = ""): string {
+    return [
+        "You are helping a church keep the sermon after the service.",
+        "These are summaries of consecutive parts of one service. Merge them into one note.",
+        "Return ONLY JSON, no prose and no code fence, in this exact shape:",
+        '{"title":"","summary":"","outline":[{"heading":"","points":[""]}],"scripture":["Book 1:1"],"tags":[""]}',
+        "Ignore anything that was announcements or administration rather than preaching.",
+        "summary is 3 to 5 sentences. outline has 3 to 6 headings with up to 4 short points.",
+        "scripture lists only references actually named.",
+        title ? `The service is titled "${title}".` : "",
+        "Part summaries:",
+        summaries.map((summary, index) => `Part ${index + 1}: ${summary}`).join("\n")
+    ]
+        .filter(Boolean)
+        .join("\n")
+}
+
 /** Ask for the note. The shape is fixed so the parser above always has something to read. */
 export function buildNotesPrompt(transcript: string, title = ""): string {
     return [

@@ -58,7 +58,9 @@ export class LLMManager {
 
     private retryTimeout: ReturnType<typeof setTimeout> | null = null
     private isRequesting = false
-    async request<T>(options: LLMRequestOptions): Promise<T | null> {
+
+    /** Raw completion text, for prose. JSON shapes go through request(). */
+    async requestText(options: LLMRequestOptions): Promise<string | null> {
         if (this.isRequesting) return null
         this.isRequesting = true
 
@@ -69,19 +71,30 @@ export class LLMManager {
 
         try {
             const data = { providerId: this.providerId, model: this.model, options }
-            const response = await requestMain(Main.AI_LLM_COMPLETE, data, undefined, 60000)
+            const response = await requestMain(Main.AI_LLM_COMPLETE, data, undefined, 120000)
 
             if (response?.error || !response?.text) {
                 if (response?.error) console.error("LLM error:", response.error)
                 return null
             }
 
-            return JSON.parse(response.text) as T
+            return response.text
         } catch (error: any) {
             console.error("LLM request failed:", error?.message || error)
             return null
         } finally {
             this.isRequesting = false
+        }
+    }
+
+    async request<T>(options: LLMRequestOptions): Promise<T | null> {
+        const text = await this.requestText(options)
+        if (!text) return null
+
+        try {
+            return JSON.parse(text) as T
+        } catch {
+            return null
         }
     }
 

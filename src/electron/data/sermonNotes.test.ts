@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { SermonNote } from "../../types/ai/Sermon"
-import { assembleNote, buildDevotionalPrompt, buildNotesPrompt, buildQuizPrompt, noteFileName, parseModelJson, parseNote, serializeNote } from "./sermonNotes"
+import { assembleNote, buildChunkSummaryPrompt, buildDevotionalPrompt, buildMergePrompt, buildNotesPrompt, buildQuizPrompt, chunkTranscript, noteFileName, parseModelJson, parseNote, serializeNote } from "./sermonNotes"
 
 const note: SermonNote = {
     id: "2026-11-22 the-life-that-purpose-built",
@@ -88,6 +88,47 @@ describe("reading model output", () => {
         expect(parseModelJson("no json here")).toBeNull()
         expect(parseModelJson('{"broken": ')).toBeNull()
         expect(parseModelJson("")).toBeNull()
+    })
+})
+
+describe("chunking a long service", () => {
+    it("leaves a short transcript alone", () => {
+        const short = "word ".repeat(200).trim()
+        expect(chunkTranscript(short)).toHaveLength(1)
+    })
+
+    it("splits a long one with overlap so no sentence is cut in half", () => {
+        const words = Array.from({ length: 3000 }, (_, index) => `w${index}`)
+        const chunks = chunkTranscript(words.join(" "), 1200, 60)
+
+        expect(chunks.length).toBeGreaterThan(1)
+        // every word survives somewhere
+        const seen = new Set(chunks.join(" ").split(" "))
+        expect(seen.size).toBe(3000)
+        // consecutive chunks share the overlap
+        const firstTail = chunks[0].split(" ").slice(-1)[0]
+        expect(chunks[1].split(" ")).toContain(firstTail)
+    })
+
+    it("returns nothing for an empty transcript", () => {
+        expect(chunkTranscript("   ")).toEqual([])
+    })
+})
+
+describe("part prompts", () => {
+    it("names the part and asks for prose", () => {
+        const prompt = buildChunkSummaryPrompt("the sermon", 2, 5)
+        expect(prompt).toContain("part 2 of 5")
+        expect(prompt).toContain("plain prose")
+        expect(prompt).toContain("the sermon")
+    })
+
+    it("asks the merge for the same JSON shape as a single pass", () => {
+        const prompt = buildMergePrompt(["first part", "second part"])
+        expect(prompt).toContain('"outline"')
+        expect(prompt).toContain("ONLY JSON")
+        expect(prompt).toContain("Part 1: first part")
+        expect(prompt).toContain("Part 2: second part")
     })
 })
 

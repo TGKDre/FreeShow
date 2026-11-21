@@ -185,6 +185,17 @@ export function convertText({ name = "", origin = "", category = null, text, noF
     const selectedIndex = get(activeShow)?.index === undefined ? undefined : get(activeShow)!.index! + 1
     history({ id: "UPDATE", newData: { data: show, remember: { project: get(activeProject), index: selectedIndex } }, oldData: { id: showId }, location: { page: "show", id: "show" } })
 
+    // an imported song or announcement exists on disk the moment it is created, not only after
+    // somebody remembers to save; loaded lazily so the converter does not import the save stack
+    setTimeout(async () => {
+        try {
+            const { save } = await import("../utils/save")
+            save()
+        } catch (err) {
+            console.warn("Could not save the imported show:", err)
+        }
+    }, 800)
+
     return { id: showId, show }
 }
 

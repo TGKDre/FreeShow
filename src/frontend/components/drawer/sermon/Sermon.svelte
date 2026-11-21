@@ -2,8 +2,11 @@
     import type { LexiconEntry } from "../../../../types/ai/Lexicon"
     import type { SermonNote } from "../../../../types/ai/Sermon"
     import { Main } from "../../../../types/IPC/Main"
-    import { assembleNote, buildDevotionalPrompt, buildNotesPrompt, buildQuizPrompt, parseModelJson } from "../../../../types/ai/sermonFormat"
+    import { assembleNote, buildChunkSummaryPrompt, buildDevotionalPrompt, buildMergePrompt, buildNotesPrompt, buildQuizPrompt, chunkTranscript, parseModelJson } from "../../../../types/ai/sermonFormat"
     import { convertText } from "../../../converters/txt"
+    import { getFirstActiveOutput } from "../../helpers/output"
+    import { getLayoutRef } from "../../helpers/show"
+    import { updateOut } from "../../helpers/showActions"
     import { getLLMManager } from "../../../ai/llm/llmManager"
     import { lookupAnywhere } from "../../../ai/lexicon/Lexicon"
     import { requestMain } from "../../../IPC/main"
@@ -82,9 +85,29 @@
         }
 
         busy = true
-        status = "Reading the sermon..."
         try {
-            const parsed = readModelResult(await llm.request<any>({ prompt: buildNotesPrompt(transcript) }))
+            // a long service does not fit one prompt, so each part is summarised first and the
+            // summaries are merged; the middle of the sermon is exactly what gets lost otherwise
+            const chunks = chunkTranscript(transcript)
+            let prompt = buildNotesPrompt(transcript)
+
+            if (chunks.length > 1) {
+                const summaries: string[] = []
+                for (let index = 0; index < chunks.length; index++) {
+                    status = `Reading part ${index + 1} of ${chunks.length}...`
+                    const summary = await llm.requestText({ prompt: buildChunkSummaryPrompt(chunks[index], index + 1, chunks.length) })
+                    if (summary) summaries.push(summary.trim())
+                }
+
+                if (!summaries.length) {
+                    status = "The model did not return anything usable."
+                    return
+                }
+                prompt = buildMergePrompt(summaries)
+            }
+
+            status = "Writing the note..."
+            const parsed = readModelResult(await llm.request<any>({ prompt }))
             if (!parsed) {
                 status = "The model did not return usable JSON. Try again, or with a stronger model."
                 return
@@ -153,14 +176,34 @@
 
     // --- announcements ---
     let announcement = ""
+    // what was on screen before the announcement, so a wrong click is one click to undo
+    let previousSlide: { id: string; index: number } | null = null
 
     function sendAnnouncement() {
         const text = announcement.trim()
         if (!text) return
+
+        const output = getFirstActiveOutput()
+        const slide = output?.out?.slide
+        previousSlide = slide?.id && slide.index !== undefined ? { id: slide.id, index: slide.index } : null
+
         // convertText opens the created show, and a slide with no bindings goes to every active output
         convertText({ name: "Announcement", category: null, text })
         announcement = ""
         status = "Sent."
+    }
+
+    function backToPrevious() {
+        if (!previousSlide) return
+
+        const layout = getLayoutRef(previousSlide.id)
+        if (!layout.length) {
+            status = "That slide is no longer loaded."
+            return
+        }
+
+        updateOut(previousSlide.id, previousSlide.index, layout)
+        status = "Back to the previous slide."
     }
 
     // --- word study ---
@@ -176,6 +219,14 @@
         results = await lookupAnywhere(text)
         entry = results[0] || null
         studyStatus = results.length ? "" : "Nothing found. Try a Strong's number like G26 or a word."
+    }
+
+    function presentEntry() {
+        if (!entry) return
+
+        const lines = [entry.lemma, `${entry.strongs} · ${entry.translit}${entry.pron ? ` · ${entry.pron}` : ""}`, entry.definition, entry.kjv ? `KJV: ${entry.kjv}` : ""].filter(Boolean)
+        convertText({ name: entry.strongs, category: null, text: lines.join("\n") })
+        studyStatus = "Sent to the screens."
     }
 
     function copy(text: string) {
@@ -204,6 +255,9 @@
         <textarea class="search" rows="6" bind:value={announcement} placeholder="This Sunday: prayer at 9:30, service at 10."></textarea>
         <div class="row">
             <MaterialButton icon="play_arrow" on:click={sendAnnouncement}>Show on all screens</MaterialButton>
+            {#if previousSlide}
+                <MaterialButton icon="undo" on:click={backToPrevious}>Back to previous slide</MaterialButton>
+            {/if}
         </div>
         {#if status}<p class="status">{status}</p>{/if}
     {:else if mode === "notes"}
@@ -320,6 +374,7 @@
                     {#if entry.kjv}<p class="meta">KJV: {entry.kjv}</p>{/if}
                     {#if entry.derivation}<p class="meta">{entry.derivation}</p>{/if}
                     <div class="row">
+                        <MaterialButton icon="play_arrow" on:click={presentEntry}>Show it</MaterialButton>
                         <MaterialButton on:click={() => copy(`${entry.lemma} (${entry.strongs}) ${entry.translit || ""}: ${entry.definition || ""}`)}>Copy</MaterialButton>
                     </div>
                 {:else}
