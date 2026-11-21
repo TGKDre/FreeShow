@@ -102,6 +102,7 @@ mac:
     hardenedRuntime: true
     gatekeeperAssess: false
     notarize: false
+    identity: null # unsigned Grace City builds, same as the Windows artifact
     entitlements: scripts/macos/entitlements.mac.plist
     entitlementsInherit: scripts/macos/entitlements.mac.plist
     extendInfo:
