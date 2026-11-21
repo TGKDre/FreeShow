@@ -14,6 +14,7 @@ import { newToast } from "../../utils/common"
 import { getLLMManager } from "../llm/llmManager"
 import { findLyricMatch } from "../lyrics/lyricDetector"
 import { getSongLibrary, slideIdForLine } from "../lyrics/songLibrary"
+import { primeSongLibrary } from "../lyrics/songLibraryPrime"
 import { BibleCacheManager } from "../scripture/BibleCacheManager"
 import { detectBibleVersion } from "../scripture/BibleVersionDetector"
 import { isReferenceWithin } from "../scripture/references"
@@ -84,7 +85,11 @@ export class AiManager {
     private static lyricDetection(textChunk: string) {
         // scripture is checked first on purpose: worship lyrics are the fallback signal, not a competitor
         const songs = getSongLibrary()
-        if (!songs.length) return null
+        if (!songs.length) {
+            // nothing indexed yet: load the service's songs in the background and match next chunk
+            void primeSongLibrary()
+            return null
+        }
 
         const match = findLyricMatch(textChunk, songs, { excludeLine: this.lastLyricLine || undefined })
         if (!match) return null

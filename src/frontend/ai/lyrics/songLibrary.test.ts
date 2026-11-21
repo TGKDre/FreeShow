@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildSongLibrary, lineText, lyricLinesFromShow, slideIdForLine } from "./songLibrary"
+import { buildSongLibrary, lineText, lyricLinesFromShow, projectShowIds, slideIdForLine } from "./songLibrary"
 
 const slide = (lines: string[][]) => ({
     items: lines.map((parts) => ({ lines: [{ align: "", text: parts.map((value) => ({ value, style: "" })) }] }))
@@ -46,6 +46,23 @@ describe("slide for a lyric line", () => {
         expect(slideIdForLine(show as any, 99)).toBeNull()
         expect(slideIdForLine(show as any, -1)).toBeNull()
         expect(slideIdForLine(undefined, 0)).toBeNull()
+    })
+})
+
+describe("project show ids", () => {
+    it("keeps presentations and drops everything else", () => {
+        const items = [
+            { id: "a", type: "show" },
+            { id: "b" },
+            { id: "media", type: "media" },
+            { id: "section", type: "section" },
+            { id: "" }
+        ] as any
+        expect(projectShowIds(items)).toEqual(["a", "b"])
+    })
+
+    it("copes with no project", () => {
+        expect(projectShowIds(undefined)).toEqual([])
     })
 })
 

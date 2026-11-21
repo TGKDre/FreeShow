@@ -1,4 +1,5 @@
 import { get } from "svelte/store"
+import type { ProjectShowRef } from "../../../types/Projects"
 import type { Line, Show, Slide } from "../../../types/Show"
 import { showsCache } from "../../stores"
 import type { LyricSong } from "./lyricDetector"
@@ -66,6 +67,16 @@ export function buildSongLibrary(loadedShows: { [id: string]: Pick<Show, "name" 
 }
 
 let cache: LyricSong[] | null = null
+
+/** Show ids of a project, without sections, media or anything else that is not a presentation. */
+export function projectShowIds(items: ProjectShowRef[] | undefined): string[] {
+    return (items || []).filter((item) => item && item.id && (item.type || "show") === "show").map((item) => item.id)
+}
+
+/** Replace the cache, used after preloading a project's shows. */
+export function setSongLibrary(songs: LyricSong[] | null) {
+    cache = songs
+}
 
 export function getSongLibrary(): LyricSong[] {
     if (cache) return cache
