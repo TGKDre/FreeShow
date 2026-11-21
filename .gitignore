@@ -24,5 +24,6 @@ test-results/
 *.iws
 .serena
 # generated data packs (lyrics are not ours to redistribute in git; bibles are licensed)
-assets/data/
+assets/data/*
+!assets/data/.gitkeep
 bibles-raw/
