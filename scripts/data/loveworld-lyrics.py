@@ -19,7 +19,7 @@ from urllib.request import Request, urlopen
 
 SITE = "https://loveworldlyrics.com"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "data", "loveworld-songs.json")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "data", "loveworld-songs.json")
 
 SECTION_RE = re.compile(
     r"^(verse|chorus|bridge|pre[- ]?chorus|intro|outro|vamp|hook|tag|refrain|interlude|instrumental|turnaround|chant|response|call|solo)\s*\d*\s*[:\-]?$",
@@ -78,7 +78,25 @@ def parse_song(html: str):
         if current is not None:
             current["lines"].append(line)
 
-    return [section for section in sections if section["lines"]]
+    kept = [section for section in sections if section["lines"]]
+    if kept:
+        return kept
+
+    # pages for some renditions carry no Verse/Chorus labels at all; the lyric block is still there,
+    # directly above the "Report an issue" row, so take what survives the navigation furniture
+    noise = re.compile(r"^(home|songs|albums|listen|subscribe|search|log ?in|sign ?in|copy|share|download|loveworld|play|next|previous|report an issue|more from)", re.I)
+    lines = [clean for raw in text.split("\n") if (clean := raw.replace("\u00a0", " ").strip())]
+    stop = next((index for index, line in enumerate(lines) if re.match(r"^report an issue", line, re.I)), len(lines))
+    body = [line for line in lines[:stop] if len(line) > 2 and not noise.match(line)]
+
+    # the page repeats its own chrome before the words: the title, the download line, the assistant
+    # buttons, and then a literal "Lyrics" heading. Everything above the last of those is not the song.
+    chrome = re.compile(r"(lyrics ?& ?audio download|loveworld lyrics|^ask$|^lyrics ai$|^from loveworld)", re.I)
+    body = [line for line in body if not chrome.match(line) or line.strip().lower() == "lyrics"]
+    cut = max((index for index, line in enumerate(body) if line.strip().lower() == "lyrics"), default=-1)
+    body = body[cut + 1:] if cut >= 0 else body
+
+    return [{"label": "Lyrics", "lines": body}] if len(body) > 1 else []
 
 
 def main():
