@@ -34,6 +34,12 @@
         { name: "Word", extensions: ["doc", "docx"], id: "word" },
         { name: "ProPresenter", extensions: ["pro4", "pro5", "pro6", "pro", "json", "proBundle"], id: "propresenter" },
         {
+            name: "ProPresenter Themes",
+            extensions: [],
+            id: "propresenter_theme",
+            tutorial: "Pick the <i>Themes</i> folder inside <i>Documents/ProPresenter</i>, or a single theme folder. Each theme becomes a set of templates in the template list, one per slide layout."
+        },
+        {
             name: "ProPresenter Playlist",
             extensions: [],
             id: "propresenter_playlist",

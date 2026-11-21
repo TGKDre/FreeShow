@@ -14,11 +14,24 @@ import { detectFileType } from "./bibleDetecter"
 import { filePathHashCode } from "./thumbnails"
 import { materializeMedia } from "./ppMedia"
 import { parsePlaylistContainer } from "./ppPlaylist"
+import { readThemeLibrary } from "./ppThemeImport"
 import { decompressZip, decompressZipStream, isZip } from "./zip"
 
 type FileData = { content: Buffer | string | object; path?: string; name?: string; extension?: string }
 
 const specialImports = {
+    propresenter_theme: async (files: string[]) => {
+        sendToMain(ToMain.ALERT, "popup.importing")
+
+        // Each theme becomes one template per slide layout; the renderer writes them into the templates store.
+        try {
+            const themes = readThemeLibrary(files)
+            return themes.map((theme) => ({ name: theme.name, content: JSON.stringify({ templates: theme.templates }) }))
+        } catch (err) {
+            console.error("ProPresenter themes could not be read:", err)
+            return []
+        }
+    },
     propresenter_playlist: async (files: string[]) => {
         sendToMain(ToMain.ALERT, "popup.importing")
 
