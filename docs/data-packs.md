@@ -38,6 +38,20 @@ which the Bible drawer displays.
 
 `bibles-raw/` is ignored too. To add a translation, drop its `.bib` file in and run the command again.
 
+## A Bible from USFM
+
+```bash
+npm run data:usfm -- /path/to/usfm-folder assets/data/bibles/YOR.json YOR "Bíbélì Mímọ́ Òde-Òní" "Biblica, Inc. CC BY-SA 4.0"
+```
+
+Converts a folder of `.usfm` files, sorted by their numeric prefix, into one bible. Footnotes, cross
+references, section headings and inline markers are stripped, so a verse lands on screen as the words
+the congregation reads.
+
+The Yoruba Contemporary Bible ships this way: Biblica released it under CC BY-SA 4.0, which permits
+redistribution with attribution, and the attribution travels in the bible's copyright field where the
+drawer shows it.
+
 ## What reaches the app
 
 `electron-builder` copies `assets/data/` into `resources/data/` (`extraResources` in

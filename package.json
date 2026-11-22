@@ -1,6 +1,6 @@
 {
     "name": "freeshow",
-    "version": "1.6.8-beta.5",
+    "version": "1.6.8-beta.6",
     "private": true,
     "main": "build/electron/index.js",
     "description": "Show song lyrics and more for free!",
@@ -19,6 +19,7 @@
         "postinstall": "electron-builder install-app-deps",
         "data:lyrics": "python3 scripts/data/loveworld-lyrics.py",
         "data:bibles": "node scripts/data/bibleshow-to-freeshow.mjs bibles-raw assets/data/bibles",
+        "data:usfm": "node scripts/data/usfm-to-freeshow.mjs",
         "rebuild-opus": "electron-rebuild -f -o @discordjs/opus && node scripts/opus.js",
         "---DEVELOPMENT---": "",
         "start": "node scripts/start.js",
