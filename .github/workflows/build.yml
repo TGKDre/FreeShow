@@ -8,10 +8,11 @@ jobs:
 
     strategy:
       matrix:
+        # macOS runners are the only ones GitHub bills for, even on a public repo, so the matrix
+        # builds Windows and Linux and leaves the Mac build to a machine that already has one
         os:
           [
             windows-latest,
-            macos-latest,
             ubuntu-latest
           ]
 
