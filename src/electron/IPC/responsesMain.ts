@@ -42,7 +42,7 @@ import { listGraphicsDevices } from "../utils/gpu"
 import { getMachineId } from "../utils/helpers"
 import { LyricSearch } from "../utils/LyricSearch"
 import { fetchSyncedLyrics } from "../utils/lrclib"
-import { listNotes, loadNote, saveNote } from "../data/sermonNotes"
+import { listNotes, loadNote, saveNote, saveNotePage } from "../data/sermonNotes"
 import { closeMidiInPorts, getMidiInputs, getMidiOutputs, receiveMidi, sendMidi } from "../utils/midi"
 import { getHidDevices, hidAwaitInput, hidClose } from "../utils/hid"
 import { deleteShows, deleteShowsNotIndexed, getAllShows, getEmptyShows, refreshAllShows } from "../utils/shows"
@@ -177,6 +177,7 @@ export const mainResponses: MainResponses = {
     [Main.SAVE_SERMON_NOTE]: (data) => ({ path: saveSermonNote(data) }),
     [Main.LIST_SERMON_NOTES]: () => listSermonNotes(),
     [Main.LOAD_SERMON_NOTE]: (data) => loadSermonNote(data.id),
+    [Main.SHARE_SERMON_NOTE]: (data) => ({ path: shareSermonNote(data) }),
     // FILES
     [Main.RESTORE]: (data) => restoreFiles(data),
     [Main.RECORDER]: (data) => saveRecording(data),
@@ -439,6 +440,13 @@ function sermonNotesFolder() {
 
 function saveSermonNote(note: SermonNote) {
     return saveNote(sermonNotesFolder(), note)
+}
+
+/** Writes the note as a page and shows it in the file browser, ready to send or print. */
+function shareSermonNote(note: SermonNote) {
+    const file = saveNotePage(sermonNotesFolder(), note)
+    shell.showItemInFolder(file)
+    return file
 }
 
 function listSermonNotes() {

@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { SettingsTabs } from "../../../types/Tabs"
     import { activePage, activeProfile, focusMode, profiles, settingsTab } from "../../stores"
-    import { settingsTabs } from "../../values/tabs"
+    import { settingsGroups, settingsTabs } from "../../values/tabs"
     import { clone } from "../helpers/array"
     import Icon from "../helpers/Icon.svelte"
     import T from "../helpers/T.svelte"
@@ -48,11 +48,17 @@
 {/if}
 
 <div class="main">
-    {#each activeTabs as tab}
-        <Button id="button" on:click={() => settingsTab.set(tab)} active={$settingsTab === tab} bold={false}>
-            <Icon id={tab} right white={$settingsTab === tab} />
-            <p style="margin: 5px;"><T id="settings.{tab}" /></p>
-        </Button>
+    {#each settingsGroups as group}
+        {@const visible = group.tabs.filter((tab) => activeTabs.includes(tab))}
+        {#if visible.length}
+            <p class="group">{group.name}</p>
+            {#each visible as tab}
+                <Button id="button" on:click={() => settingsTab.set(tab)} active={$settingsTab === tab} bold={false}>
+                    <Icon id={tab} right white={$settingsTab === tab} />
+                    <p style="margin: 5px;"><T id="settings.{tab}" /></p>
+                </Button>
+            {/each}
+        {/if}
     {/each}
 </div>
 
@@ -69,8 +75,15 @@
         width: 100%;
     }
 
-    .main :global(button:nth-child(even)) {
-        background-color: rgb(0 0 20 / 0.08);
+    /* group headings, the way ProPresenter lists its preferences */
+    .group {
+        margin: 0.9em 0 0.25em;
+        padding: 0 0.8em;
+        font-size: 0.72em;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.45;
+        user-select: none;
     }
 
     .main :global(button.active) {

@@ -9,7 +9,9 @@ publish:
     - provider: github
       owner: TGKDre
       repo: FreeShow
-      releaseType: draft
+      # a draft is invisible until somebody publishes it by hand, which is how beta.5 sat unlisted;
+      # these builds are betas, so publish them as prereleases the moment the job finishes
+      releaseType: prerelease
 
 files:
     - build/electron/**

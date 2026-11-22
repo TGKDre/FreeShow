@@ -136,6 +136,7 @@ export enum Main {
     SAVE_SERMON_NOTE = "SAVE_SERMON_NOTE",
     LIST_SERMON_NOTES = "LIST_SERMON_NOTES",
     LOAD_SERMON_NOTE = "LOAD_SERMON_NOTE",
+    SHARE_SERMON_NOTE = "SHARE_SERMON_NOTE",
     RECORDER = "RECORDER",
     RESTORE = "RESTORE",
     SYSTEM_OPEN = "SYSTEM_OPEN",
@@ -264,6 +265,7 @@ export interface MainSendPayloads {
     [Main.SAVE_SERMON_NOTE]: SermonNote
     [Main.LIST_SERMON_NOTES]: undefined
     [Main.LOAD_SERMON_NOTE]: { id: string }
+    [Main.SHARE_SERMON_NOTE]: SermonNote
     [Main.RESTORE]?: { path: string }
     [Main.RECORDER]: { blob: ArrayBuffer; name: string; path?: string }
     [Main.SYSTEM_OPEN]: string
@@ -394,6 +396,7 @@ export interface MainReturnPayloads {
     [Main.SAVE_SERMON_NOTE]: { path: string }
     [Main.LIST_SERMON_NOTES]: { id: string; title: string; date: string }[]
     [Main.LOAD_SERMON_NOTE]: SermonNote | null
+    [Main.SHARE_SERMON_NOTE]: { path: string }
     [Main.GET_SIMILAR]: { path: string; name: string }[]
     [Main.RESTORE_CLOUD_BACKUP]: Promise<{ success: boolean; error?: string }>
     [Main.MEDIA_FOLDER_COPY]: Promise<boolean>

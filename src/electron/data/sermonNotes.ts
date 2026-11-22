@@ -2,6 +2,7 @@ import fs from "fs"
 import path from "path"
 import { noteFileName, parseNote, serializeNote } from "../../types/ai/sermonFormat"
 import type { SermonNote } from "../../types/ai/Sermon"
+import { noteToHtml } from "../../types/ai/noteExport"
 
 export * from "../../types/ai/sermonFormat"
 export type { SermonDevotional, SermonNote, SermonQuizQuestion } from "../../types/ai/Sermon"
@@ -19,6 +20,19 @@ export function saveNote(dir: string, note: SermonNote): string {
     const file = noteFileName(note.title, note.date)
     const fullPath = path.join(dir, file)
     fs.writeFileSync(fullPath, serializeNote(note), "utf8")
+    return fullPath
+}
+
+/**
+ * The same note as a page the congregation can open on a phone.
+ *
+ * Saved beside the markdown so one note stays one thing on disk, named the same, and the operator can
+ * send the file, print it, or open it in front of the room.
+ */
+export function saveNotePage(dir: string, note: SermonNote): string {
+    fs.mkdirSync(dir, { recursive: true })
+    const fullPath = path.join(dir, noteFileName(note.title, note.date).replace(/\.md$/i, ".html"))
+    fs.writeFileSync(fullPath, noteToHtml(note), "utf8")
     return fullPath
 }
 

@@ -2,6 +2,7 @@
     import type { LexiconEntry } from "../../../../types/ai/Lexicon"
     import type { SermonNote } from "../../../../types/ai/Sermon"
     import { Main } from "../../../../types/IPC/Main"
+    import { noteToText } from "../../../../types/ai/noteExport"
     import { assembleNote, buildChunkSummaryPrompt, buildDevotionalPrompt, buildMergePrompt, buildNotesPrompt, buildQuizPrompt, chunkTranscript, parseModelJson } from "../../../../types/ai/sermonFormat"
     import { convertText } from "../../../converters/txt"
     import { getFirstActiveOutput } from "../../helpers/output"
@@ -69,6 +70,24 @@
             selected = note
             status = message
         } else status = "Could not write the note. Check the Sermon Notes folder."
+    }
+
+    /** A page the congregation can open on a phone or print, written beside the markdown. */
+    async function shareNote() {
+        if (!selected) return
+        const result = await requestMain(Main.SHARE_SERMON_NOTE, selected)
+        status = result?.path ? `Page written: ${result.path.split(/[\\/]/).pop()}` : "Could not write the page."
+    }
+
+    /** The same note as plain text, for WhatsApp or a message to the team. */
+    async function copyNoteText() {
+        if (!selected) return
+        try {
+            await navigator.clipboard.writeText(noteToText(selected))
+            status = "Note copied as text."
+        } catch {
+            status = "The clipboard refused. Try Share page instead."
+        }
     }
 
     async function generateNote() {
@@ -312,6 +331,11 @@
                             {/each}
                         </ul>
                     {/if}
+
+                    <div class="row">
+                        <MaterialButton icon="share" on:click={shareNote} disabled={busy}>Share page</MaterialButton>
+                        <MaterialButton icon="copy" on:click={copyNoteText} disabled={busy}>Copy text</MaterialButton>
+                    </div>
 
                     <div class="row">
                         <MaterialButton on:click={() => addDevotionals(3)} disabled={busy}>3 day devotional</MaterialButton>

@@ -1,6 +1,19 @@
 import type { SettingsTabs } from "../../types/Tabs"
 
-export const settingsTabs: SettingsTabs[] = ["general", "display_settings", "styles", "audio", "connection", "files", "profiles", "theme", "ai", "other"]
+// Ordered the way the team already knows it from ProPresenter: general first, appearance together,
+// then what is on screen, then media and devices, then files, with profiles last.
+export const settingsGroups: { name: string; tabs: SettingsTabs[] }[] = [
+    { name: "General", tabs: ["general", "other"] },
+    { name: "Appearance", tabs: ["theme", "styles"] },
+    { name: "Screens", tabs: ["display_settings"] },
+    { name: "Media and audio", tabs: ["audio"] },
+    { name: "Scripture and AI", tabs: ["ai"] },
+    { name: "Devices and network", tabs: ["connection"] },
+    { name: "Files and backups", tabs: ["files"] },
+    { name: "Profiles", tabs: ["profiles"] }
+]
+
+export const settingsTabs: SettingsTabs[] = settingsGroups.flatMap((group) => group.tabs)
 
 export const drawerTabs = {
     shows: { name: "tabs.shows", icon: "shows", title: "tabs.shows_info" },
