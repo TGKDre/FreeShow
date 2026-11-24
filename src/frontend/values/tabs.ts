@@ -5,7 +5,7 @@ import type { SettingsTabs } from "../../types/Tabs"
 export const settingsGroups: { name: string; tabs: SettingsTabs[] }[] = [
     { name: "General", tabs: ["general", "other"] },
     { name: "Appearance", tabs: ["theme", "styles"] },
-    { name: "Screens", tabs: ["display_settings"] },
+    { name: "Screens", tabs: ["display_settings", "stage"] },
     { name: "Media and audio", tabs: ["audio"] },
     { name: "Scripture and AI", tabs: ["ai"] },
     { name: "Devices and network", tabs: ["connection"] },

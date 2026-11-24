@@ -19,6 +19,7 @@
     import Profiles from "./tabs/Profiles.svelte"
     import ProfilesButtons from "./tabs/ProfilesButtons.svelte"
     import ProfilesTabs from "./tabs/ProfilesTabs.svelte"
+    import Stage from "./tabs/Stage.svelte"
     import Styles from "./tabs/Styles.svelte"
     import StylesButtons from "./tabs/StylesButtons.svelte"
     import StylesTabs from "./tabs/StylesTabs.svelte"
@@ -36,6 +37,7 @@
 
     const hints = {
         display_settings: "settings.outputs_hint",
+        stage: "stage.settings_hint",
         styles: "settings.styles_hint",
         audio: "settings.audio_hint",
         profiles: "profile.profiles_hint",
@@ -79,6 +81,8 @@
             {:else}
                 <Outputs />
             {/if}
+        {:else if tabId === "stage"}
+            <Stage />
         {:else if tabId === "styles"}
             <Styles />
         {:else if tabId === "audio"}

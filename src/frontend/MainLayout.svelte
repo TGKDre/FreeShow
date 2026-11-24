@@ -99,6 +99,7 @@
                 {:else if page === "draw"}
                     <LazyLoad component={() => import("./components/draw/DrawSettings.svelte")} show={page === "draw"} />
                 {:else if page === "stage" && $activeStage.id}
+                    <LazyLoad component={() => import("./components/stage/tools/StageElements.svelte")} show={page === "stage" && !!$activeStage.id} />
                     <LazyLoad component={() => import("./components/stage/StageTools.svelte")} show={page === "stage" && !!$activeStage.id} />
                 {:else if page === "settings"}
                     <LazyLoad component={() => import("./components/settings/SettingsTools.svelte")} show={page === "settings"} />

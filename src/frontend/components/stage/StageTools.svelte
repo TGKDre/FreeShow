@@ -20,7 +20,7 @@
     const tabs: TabsObj = {
         text: { name: "items.text", icon: "text" },
         item: { name: "tools.item", icon: "item" },
-        slide: { name: "edit.options", icon: "options", overflow: true } // tools.slide
+        slide: { name: "stage.stage_layout", icon: "options", overflow: true }
     }
 
     const profile = getAccess("stage")
@@ -213,7 +213,8 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        height: 100%;
+        flex: 1;
+        min-height: 0;
     }
 
     .content {

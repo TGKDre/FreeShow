@@ -50,7 +50,8 @@ export function addStageItem(itemType: string, options: any = {}, textValue = ""
             item.lines = [{ align: "", text: [{ style: "", value: textValue || "" }] }]
         } else if (itemType === "slide_text") {
             const slideTextItems = existingItems.filter((i: any) => i.type === "slide_text")
-            item.slideOffset = slideTextItems.length
+            // explicit offset wins, so "Next Slide" can be added before "Current Slide"
+            if (typeof options.slideOffset !== "number") item.slideOffset = slideTextItems.length
             item.style += "font-size: 800px;"
         }
 
@@ -130,6 +131,56 @@ function dynamicValueString(text: string) {
 
 export function getStageItemId(itemId: string) {
     return itemId.split("#")[1]
+}
+
+// ProPresenter's own vocabulary for stage elements, so the operator reads
+// "Current Slide" and "Program Feed" instead of "slide_text" and "current_output".
+export function getStageElementName(item: StageItem): string {
+    const type = item?.type || "text"
+    const slideOffset = Number(item?.slideOffset || 0)
+
+    if (type === "slide_text") {
+        if (slideOffset === 0) return translateText("stage.element_current_slide")
+        if (slideOffset === 1) return translateText("stage.element_next_slide")
+
+        const sign = slideOffset > 0 ? "+" : ""
+        return `${translateText("stage.element_slide")} ${sign}${slideOffset}`
+    }
+
+    const names: { [key: string]: string } = {
+        slide_notes: "stage.element_notes",
+        text: "stage.element_message",
+        timer: "stage.element_timer",
+        clock: "stage.element_clock",
+        current_output: "stage.element_program_feed",
+        media: "stage.element_media",
+        camera: "stage.element_camera",
+        web: "stage.element_web",
+        qr_code: "stage.element_qr_code",
+        slide_tracker: "stage.element_slide_progress",
+        metronome: "stage.element_metronome",
+        visualizer: "stage.element_visualizer",
+        variable: "stage.element_variable"
+    }
+
+    return translateText(names[type] || `items.${type}`)
+}
+
+// The specific thing an element is bound to: which timer, which output, which file.
+export function getStageElementDetail(item: StageItem): string {
+    const type = item?.type || "text"
+
+    if (type === "timer") return get(timers)[item.timer?.id]?.name || ""
+    if (type === "variable") return get(variables)[item.variable?.id || ""]?.name || ""
+    if (type === "current_output") return get(outputs)[item.currentOutput?.source || ""]?.name || ""
+    if (type === "media") return (item.src || "").split(/[\\/]/).pop() || ""
+    if (type === "camera") return item.device?.name || ""
+    if (type === "text") {
+        const text = getItemText(item as Item)
+        return /^\{.*\}$/.test(text) ? text.slice(0, 40) : ""
+    }
+
+    return ""
 }
 
 export function stageItemToItem(item: StageItem) {
